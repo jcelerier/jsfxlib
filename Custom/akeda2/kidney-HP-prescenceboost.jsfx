@@ -1,0 +1,78 @@
+desc:Kidney Highpass filter for cardioid proximity near-miking, with prescenceboost
+//tags: cardioid highpass prescence proximity
+//author: Akeda
+
+import cookdsp.jsfx-inc
+
+slider1:120<20,300,0.5>Highpass frequency (Hz)
+slider2:0<0,2,1{6dB,12dB,off}>Highpass filter type 6dB/12dB/off
+
+slider5:0<-18,18,0.1>Presence notch/boost (dB)
+slider6:3500<1000,10000,1>Presence notch/boost frequency (Hz)
+slider7:0.5<0.1,2,0.1>Presence notch/boost q
+
+//slider8:0<
+
+slider9:0<-30,18,0.5>Output pad (dB)
+
+@init
+itm1=itm2=otm1=otm2=0;
+
+//Rumble-filter
+//L.moog(
+//Proximity HP-filter
+LHP6.hip(slider1);
+RHP6.hip(slider1);
+LHP12.buthp(slider1);
+RHP12.buthp(slider1);
+
+//Squeek-notch
+LSN.eq(slider6,slider7,slider5,0);
+RSN.eq(slider6,slider7,slider5,0);
+amp = 1;
+
+
+@slider
+
+//HP
+LHP6.hip_set_freq(slider1);
+RHP6.hip_set_freq(slider1);
+LHP12.buthp_set_freq(slider1);
+RHP12.buthp_set_freq(slider1);
+
+//Squeek-notch
+LSN.eq_set_freq(slider6);
+RSN.eq_set_freq(slider6);
+LSN.eq_set_boost(slider5);
+RSN.eq_set_boost(slider5);
+LSN.eq_set_q(slider7);
+RSN.eq_set_q(slider7);
+
+amp = dbtoa(slider9);
+
+//@block
+
+@sample
+
+slider2 != 2 ? (
+ slider2 == 1 ? (
+   spl0 = LHP12.buthp_do(spl0);
+   spl1 = RHP12.buthp_do(spl1);
+   );
+  slider2 == 0 ? (
+   spl0 = LHP6.hip_do(spl0);
+   spl1 = RHP6.hip_do(spl1);
+   );
+ );
+  
+slider5 != 0 ? (
+ spl0 = LSN.eq_do(spl0);
+ spl1 = RSN.eq_do(spl1);
+ );
+
+spl0*=amp;
+spl1*=amp;
+
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+

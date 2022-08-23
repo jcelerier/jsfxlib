@@ -1,0 +1,73 @@
+desc:4-channel to stereo mixer 1,2 is L,R. 3 is Center. 4 is (optional) spot.
+
+import cookdsp.jsfx-inc
+
+
+in_pin:Left
+in_pin:Right
+in_pin:Center
+in_pin:Spot
+out_pin:Left
+out_pin:Right
+
+slider1:-1.6<-90,10,0.2>Stereo-LR
+slider2:-1.6<-90,10,0.2>Center
+slider3:-90<-90,32,0.2>Spot
+slider4:0<-12,12,0.1>Crossfade: L,R <-|-> Center
+slider5:0<0,2,1{off,6dB/oct,12dB/oct>Spot Low-cut
+slider6:120<40,300,1>Spot LC frequency (Hz)
+
+@init
+bpos=0;
+slp6.lop(slider6);
+slp12.buthp(slider6);
+
+
+@slider
+stereolevel = 10^(slider1/20);
+centerlevel = 10^(slider2/20);
+spotlevel = 10^(slider3/20);
+slp6.lop_set_freq(slider6);
+slp12.buthp_set_freq(slider6);
+
+//Crossfade:
+slider4 < -40 ? slider4 = -40;
+slider4 > 40 ? slider4 = 40;
+
+mixPercent = slider4;
+mixPercent == 40 ? mixPercent = 100;
+mixPercent == -40 ? mixPercent = -100;
+slider4 <= 0 ?
+(
+crossT1 = 1;
+crossT2 = 2 ^ ( mixPercent/ 6 );
+) :
+(
+crossT1 = 2 ^ ( -mixPercent / 6 );
+crossT2 = 1;
+);
+
+
+@block
+blah+=samplesblock;
+
+@sample
+//inputs
+inL = spl0;
+inR = spl1;
+inC = spl2;
+inSpot = spl3;
+//HP
+slider5 != 0 ? (
+  slider5 == 1 ? (
+   inSpot = slp6.lop_do(inSpot);
+   );
+ inSpot = slp12.buthp_do(inSpot);
+);
+
+//output
+spl0 = (inL*stereolevel*crossT1) + (inC*centerlevel*crossT2) + (inSpot*spotlevel);
+spl1 = (inR*stereolevel*crossT1) + (inC*centerlevel*crossT2) + (inSpot*spotlevel);
+spl2 = null;
+spl3 = null;
+

@@ -1,0 +1,288 @@
+/*
+ Nicholas Lenz
+ Github : nicholaslenz12@gmail.com
+ Distorts a signal based on 4 non-linear functions.
+ audio from 2-channels can first be converted to 1-channel before processing,
+ or the processing can be applied to both channels.
+
+ The types of distortion are:
+ Tanh
+ Arctan
+ Cubic (x^3) (potential for higher-order, odd poly's later)
+ Sine
+
+ Needs help:
+ - Needs sample-accurate automation.
+ - Needs some creativity.
+ */
+
+desc:N-Distortion
+
+// ----------------------------------------------------------------------------
+// SLIDER DEFINITIONS
+// ----------------------------------------------------------------------------
+slider1:0<0,3,1{Tanh,Arctan,Cubic,Sine}>Distortion Type
+slider2:2<0,2,1{Left,Right,Stereo}>Channel Mode
+slider3:0<-30,30,0.01>Input Gain (dB)
+slider4:0<-30,30,0.01>Output Gain (dB)
+slider5:5000<100,20000,100>RMS Size
+slider6:1<1,5,0.01>Zoom
+slider7:16<1,32,1>Sections
+
+// ----------------------------------------------------------------------------
+// DEFAULT CHANNEL CONFIGURATION
+// ----------------------------------------------------------------------------
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+// ----------------------------------------------------------------------------
+// INIT
+// ----------------------------------------------------------------------------
+@init
+// Constants
+halfpi = 2*atan(1);
+quarterpi = halfpi / 2;
+pisquared = $pi * $pi;
+
+a1 = -.0000067436811832;
+a2 = .2468149110712040;
+a3 = .0583691066395175;
+a4 = .03357335044280075;
+
+b1 = .2464845986383725;
+b2 = .0609347197060491;
+b3 = .1086202599228572;
+b4 = .02874707922475963;
+
+
+// Mathematical Functions
+function tanh(x)
+(
+  //2/(1+7.389^(-x))-1;
+  x >= 0 ?
+  (
+  (a1 + (a2 + (a3 + a4 * x) * x) * x) / (b1 + (b2 + (b3 + b4 * x) * x) * x);
+  ) :
+  (
+  -(a1 + (a2 + (a3 + a4 * -x) * -x) * -x) / (b1 + (b2 + (b3 + b4 * -x) * -x) * -x);
+  );
+);
+
+function arctan(x)
+( 
+  x >= 0 ?
+  (
+  quarterpi * x + 0.273 * x * (1 - x);
+  ) :
+  (
+  quarterpi * x + 0.273 * x * (1 + x);
+  );
+);
+
+function cubic(x)
+(
+  abs(x) <= 1 ? x - x*x*x/3 : sign(x)*2/3;
+);
+
+function sine(x)
+(
+  xscaled = halfpi * x;
+  abs(x) > 1 ?
+  (
+  sign(x) / halfpi;
+  ) :
+  (
+  x >= 0 ?
+  (
+  16 * xscaled * ($pi - xscaled) / (5 * pisquared - 4 * xscaled * ($pi - xscaled)) / halfpi;
+  ) :
+  (
+  xscaled *= -1;
+  -16 * xscaled * ($pi - xscaled) / (5 * pisquared - 4 * xscaled * ($pi - xscaled)) / halfpi;
+  );
+  );
+  
+);
+
+t = 0;
+rms_L= 0;
+rms_R= 0;
+pre_spl0 = 0;
+pre_spl1 = 0;
+
+// ----------------------------------------------------------------------------
+// SLIDER
+// ----------------------------------------------------------------------------
+@slider
+mode           = slider1;
+channel_mode   = slider2;
+pre_gain       = 2^(slider3/6);
+post_gain      = 2^(slider4/6);
+window_size    = slider5;
+zoom           = slider6;
+dividers = slider7;
+last_idx       = window_size-2;
+start_post_rms_L = 2*window_size;
+start_post_rms_R = 3*window_size;
+
+
+// ----------------------------------------------------------------------------
+// SAMPLE
+// ----------------------------------------------------------------------------
+@sample
+
+channel_mode == 0 ? // mono left
+(
+    pre_spl0 = pre_spl1 = spl0;
+    mode == 0 ?
+    (
+        spl0 = post_gain*tanh(pre_gain*pre_spl0);
+    ) : mode == 1 ?
+    (
+        spl0 = post_gain*arctan(pre_gain*pre_spl0);
+    ) : mode == 2 ?
+    (
+        spl0 = post_gain*cubic(pre_gain*pre_spl0);
+    ) : mode == 3 ?
+    (
+        spl0 = post_gain*sine(pre_gain*pre_spl0);
+    );
+    spl1 = spl0;
+) : channel_mode == 1 ? // mono right
+(
+    pre_spl0 = pre_spl1 = spl1;
+    mode == 0 ?
+    (
+        spl1 = post_gain*tanh(pre_gain*pre_spl1);
+    ) : mode == 1 ?
+    (
+        spl1 = post_gain*arctan(pre_gain*pre_spl1);
+    ) : mode == 2 ?
+    (
+        spl1 = post_gain*cubic(pre_gain*pre_spl1);
+    ) : mode == 3 ?
+    (
+        spl1 = post_gain*sine(pre_gain*pre_spl1);
+    );
+    spl0 = spl1;
+) : channel_mode == 2 ? // stereo
+(
+    pre_spl0 = spl0;
+    pre_spl1 = spl1;
+    mode == 0 ?
+    (
+        spl0 = post_gain*tanh(pre_gain*pre_spl0);
+        spl1 = post_gain*tanh(pre_gain*pre_spl1);
+    ) : mode == 1 ?
+    (
+        spl0 = post_gain*arctan(pre_gain*pre_spl0);
+        spl1 = post_gain*arctan(pre_gain*pre_spl1);
+    ) : mode == 2 ?
+    (
+        spl0 = post_gain*cubic(pre_gain*pre_spl0);
+        spl1 = post_gain*cubic(pre_gain*pre_spl1);
+    ) : mode == 3 ?
+    (
+        spl0 = post_gain*sine(pre_gain*pre_spl0);
+        spl1 = post_gain*sine(pre_gain*pre_spl1);
+    );
+);
+
+rms_total_L -= t[];
+t[] = sqr(pre_spl0);
+rms_total_L += t[];
+rms_total_R -= t[window_size];
+t[window_size] = sqr(pre_spl1);
+rms_total_R += t[window_size];
+
+post_rms_total_L -= t[start_post_rms_L];
+t[start_post_rms_L] = sqr(spl0);
+post_rms_total_L += t[start_post_rms_L];
+post_rms_total_R -= t[start_post_rms_R];
+t[start_post_rms_R] = sqr(spl1);
+post_rms_total_R += t[start_post_rms_R];
+
+
+t > last_idx ? t = 0 : t += 1;
+
+// ----------------------------------------------------------------------------
+// GRAPHICS
+// ----------------------------------------------------------------------------
+@gfx 400 100
+
+font_separation = 0.05;
+
+2*gfx_h/5 > font_separation*gfx_w ?
+(
+font_position = 0;
+font_size = font_separation*gfx_w;
+)
+:
+(
+font_position = 1;
+font_size = 2*gfx_h/5;
+);
+gfx_setfont(1, "Menlo", font_size, 'b');
+
+rms_L = sqrt(rms_total_L/window_size);
+rms_R = sqrt(rms_total_R/window_size);
+rms_post_L = sqrt(post_rms_total_L/window_size);
+rms_post_R = sqrt(post_rms_total_R/window_size);
+rms_x_L = zoom*gfx_w*rms_L;
+rms_x_R = zoom*gfx_w*rms_R;
+rms_post_x_L = zoom*gfx_w*rms_post_L;
+rms_post_x_R = zoom*gfx_w*rms_post_R;
+
+gfx_r = gfx_g = gfx_b = 0.2;
+x = 0;
+loop(dividers,
+    gfx_line(x*gfx_w/dividers,0,x*gfx_w/dividers,gfx_h);
+    x += 1;
+);
+
+top_rms_R = 3*gfx_h/4;
+top_rms_post_R = 2*gfx_h/4;
+top_rms_L = 1*gfx_h/4;
+
+gfx_r = gfx_g = 0;
+gfx_b = 1;
+gfx_x = rms_x_R;
+gfx_y = gfx_h;
+gfx_rectto(0,top_rms_R);
+gfx_b = 0.5;
+gfx_rectto(rms_post_x_R,top_rms_post_R);
+
+gfx_r = gfx_g = gfx_b = 0.2;
+gfx_line(0,top_rms_post_R,gfx_w,top_rms_post_R);
+
+gfx_x = 0;
+gfx_y = top_rms_post_R;
+
+gfx_r = 1;
+gfx_g = gfx_b = 0;
+gfx_rectto(rms_x_L,top_rms_L);
+gfx_r = 0.5;
+gfx_x = 0;
+gfx_rectto(rms_post_x_L,meter_top);
+
+gfx_r = gfx_g = gfx_b = 1;
+
+gfx_x = (1-font_separation)*gfx_w;
+font_position ?
+(
+  gfx_y = 0;
+  gfx_drawstr("L");
+  gfx_x = (1-font_separation)*gfx_w;
+  gfx_y = top_rms_post_R;
+  gfx_drawstr("R");
+)
+:
+(
+  gfx_y = gfx_h/4 - font_size/2;
+  gfx_drawstr("L");
+  gfx_x = (1-font_separation)*gfx_w;
+  gfx_y = 3*gfx_h/4 - font_size/2;
+  gfx_drawstr("R");
+);

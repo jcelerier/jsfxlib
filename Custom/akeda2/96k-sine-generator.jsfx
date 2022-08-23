@@ -1,0 +1,20 @@
+desc: Up to 96kHz sine generator, mainly for ultrasonic sweeps.
+
+slider1:1000<1,96000,1.0>Frequency (hz - linear)
+slider2:-12<-144,0,1>Amplitude (db)
+
+@init
+step=1/srate;
+t=0;
+
+@slider
+two_pi_freq = 2 * $pi * slider1;
+gain = 10^(slider2/20);
+
+@block
+t > 10000 ? t -= 10000;
+
+@sample
+spl0 = spl1 = sin( two_pi_freq * t ) * gain;
+t += step;
+

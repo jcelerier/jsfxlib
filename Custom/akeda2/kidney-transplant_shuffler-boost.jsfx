@@ -1,0 +1,92 @@
+desc:Kidney Transplant - Bass boost, shuffle and width compensator for cardioid recordings
+//author: David Åkesson
+
+import cookdsp.jsfx-inc
+
+slider1:6<0,18,0.1>Reverse proximity compensating bass boost (dB)
+slider2:120<30,300,0.5>Bass boost frequency (Hz)
+slider3:0<-12,24,0.5>Bass shuffle (dB)
+slider4:80<40,300,0.5>Bass shuffle frequency (Hz)
+slider5:0<-6,6,0.1>Presence notch/boost (dB)
+slider6:3500<1000,10000,1>Presence notch/boost frequency (Hz)
+slider7:0.5<0.1,2,0.1>Presence notch/boost q
+slider8:0<-18,0,0.5>MF+HF Image narrowing (diff-High-shelf) (dB)
+slider9:0<-30,18,0.5>Output pad (dB)
+
+@init
+itm1=itm2=otm1=otm2=0;
+//bpos=0;
+//reverse roximity compensating bass boost
+RBB.eq(slider2,1,slider1,1);
+LBB.eq(slider2,1,slider1,1);
+//Bass shuffle
+SBS.eq(slider3,1,slider4,1);
+//Bass shuffle sum compensator
+BC.eq(slider3*-0.5,1,slider4,1);
+//Squeek-notch
+LSN.eq(slider6,slider7,slider5,0);
+RSN.eq(slider6,slider7,slider5,0);
+//Image narrower
+IN.eq(slider3,0.5,slider8,2);
+amp = 1;
+
+
+@slider
+//something=slider1*srate;
+
+//reverse proximity compensating bass boost
+RBB.eq_set_freq(slider2);
+LBB.eq_set_freq(slider2);
+RBB.eq_set_boost(slider1);
+LBB.eq_set_boost(slider1);
+//Bass shuffle-
+SBS.eq_set_freq(slider4);
+SBS.eq_set_boost(slider3);
+//Compensation-
+BC.eq_set_freq(slider4);
+BC.eq_set_boost(slider3*-0.5);
+//Squeek-notch
+LSN.eq_set_freq(slider6);
+RSN.eq_set_freq(slider6);
+LSN.eq_set_boost(slider5);
+RSN.eq_set_boost(slider5);
+LSN.eq_set_q(slider7);
+RSN.eq_set_q(slider7);
+//Image narrower
+IN.eq_set_freq(slider3);
+IN.eq_set_boost(slider8);
+
+amp = dbtoa(slider9);
+
+//@block
+//blah+=samplesblock;
+
+@sample
+
+slider1 != 0 ? (
+ spl0 = LBB.eq_do(spl0);
+ spl1 = RBB.eq_do(spl1);
+ );
+ 
+slider3 != 0 || slider8 != 0 ? (
+ mid = (spl0+spl1)*0.5;
+ side = (spl0-spl1)*0.5;
+ side = SBS.eq_do(side); mid = BC.eq_do(mid);
+ side = IN.eq_do(side);
+ spl0 = (mid+side);
+ spl1 = (mid-side);
+ spl2 = mid;
+ spl3 = side;
+ );
+ 
+slider5 != 0 ? (
+ spl0 = LSN.eq_do(spl0);
+ spl1 = RSN.eq_do(spl1);
+ );
+
+spl0*=amp;
+spl1*=amp;
+
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+

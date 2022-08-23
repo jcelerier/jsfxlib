@@ -1,0 +1,57 @@
+// Copyright (C) 2008  Chris Rossi
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// FIXME: Get rid of pops when moving sliders.
+
+desc: spacelab ring modulator
+
+slider1:50<0,100>osc
+slider2:50<0,100>fine tune
+slider3:100<0,100>mix
+
+// Modulating freq doesn't really work.  Math is hard.
+//slider3:25<0,100>speed
+//slider4:1<1,2>depth
+
+@init
+step=1/srate;
+t=0;
+
+@slider
+two_pi_osc_freq = 2 * $pi * ( 440 * exp(slider1*7/100-3) + slider2 - 50 );
+wet_gain = slider3 / 100;
+dry_gain = 1 - wet_gain;
+
+//two_pi_lfo_freq = 2 * $pi * 1 * exp(slider3*4/100-3);
+//depth = slider4;
+
+@block
+t > 100000 ? t -= 100000;
+
+@sample
+
+// Modulating freq doesn't really work.  Math is hard.
+//slider4 > 1.0001 ? ( 
+//    lfo = sin(two_pi_lfo_freq*t);
+//    freq_adj = depth ^ lfo * two_pi_osc_freq;
+//) : freq_adj = 0;
+
+
+osc = sin( t * two_pi_osc_freq ); // sin( t*(two_pi_osc_freq+freq_adj) );
+
+spl0 = spl0 * osc * wet_gain + spl0 * dry_gain;
+spl1 = spl1 * osc * wet_gain + spl1 * dry_gain;
+
+t += step;

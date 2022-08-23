@@ -1,0 +1,250 @@
+desc:Tevio Levammerda
+Author: Tevio
+version: 2018/09/17
+changelog: Fix Threshold, update background, update Name
+Author URI: 
+Repository: 
+Repository URI:
+Provides: Data/*
+
+*/
+EffectName: Tevio Levammerda
+
+filename:0,Data/Levamerda.GUI.png
+filename:1,Data/knob.png
+filename:2,Data/knobred.png
+
+slider1:-60<-60,0,0.1>-Threshold (dB)
+slider5:612.1<20,1000,1>-Release (ms)
+slider6:0<-20,20,0.1>-Gain Out (dB)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+
+//==============================================================
+// TO THE USER: IF YOU WANT TO CHANGE THE BACKGROUND COLOUR OF THE GUI
+// EDIT THE FOLLOWING RED, GREEN AND BLUE VALUES (0-255)
+  cRed=68;
+  cGreen=68;              
+  cBlue=68;                
+//==============================================================
+
+  log2db = 8.6858896380650365530225783783321; // 20 / ln(10)
+  db2log = 0.11512925464970228420089957273422; // ln(10) / 20 
+  attime=0.010;
+  reltime=0.100;
+  ratio=0;
+  cratio=0;
+  rundb=0;
+  overdb=0;
+  ratatcoef = exp(-1/(0.00001 * srate));
+  ratrelcoef = exp(-1/(0.5 * srate));
+  atcoef=exp(-1/(attime * srate));
+  relcoef=exp(-1/(reltime * srate));
+  mix=1;
+  gr_meter=1;
+  gr_meter_decay = exp(1/(1*srate));
+  
+  
+  function doCenterText(ctrX, ctrY, val)(
+  str = sprintf(#,"%d",  val);
+  gfx_measurestr(str, str_w, str_h);
+  gfx_r = gfx_g = gfx_b = 0.3;
+  gfx_a = 1;
+  gfx_x = ctrX - str_w/2; gfx_y = ctrY - str_h/2;
+  gfx_drawstr(str);
+);
+
+function doMouseWheel(slideval,minval,maxval,inc)(
+  mouse_wheel < 0? slideval = Max(minval,slideval-inc);
+  mouse_wheel > 0? slideval = Min(maxval,slideval+inc);
+  mouse_wheel = 0;
+  slideval;
+);
+
+function doslidercode()(
+ relslider5 = (((((30^((slider5-20)/980))-1)/29)*980)+20);
+ gainout = 10^(slider6/20);
+ thresh = slider1;
+  threshv = exp(thresh * db2log);
+  ratio = 8;
+  allin=0; cratio = ratio;
+  cthresh = (softknee ? (thresh -3) : thresh);
+  cthreshv = exp(cthresh * db2log);
+  makeup = 0;
+  makeupv = exp((makeup+autogain) * db2log);
+  attime = 690 / 1000000;
+  reltime = relslider5 / 1000;
+  atcoef=exp(-1/(attime * srate));
+  relcoef=exp(-1/(reltime * srate));
+  mix=0.5;
+);
+
+@slider
+ 
+  doslidercode(); 
+ 
+  
+
+@sample
+
+  ospl0 = spl0;
+  ospl1 = spl1;
+  aspl0 = abs(spl0);
+  aspl1 = abs(spl1);
+  maxspl = max(aspl0, aspl1);
+  maxspl = maxspl * maxspl;
+  runave = maxspl + rmscoef * (runave - maxspl);
+  det = sqrt(max(0,runave));
+
+  overdb = 2.08136898 * log(det/cthreshv) * log2db;
+  overdb = max(0,overdb);
+
+  overdb - rundb > 5 ? (averatio = 4;);
+
+  overdb > rundb ? (
+    rundb = overdb + atcoef * (rundb - overdb);
+    runratio = averatio + ratatcoef * (runratio - averatio);
+  ) : (
+    rundb = overdb + relcoef * (rundb - overdb);
+    runratio = averatio + ratrelcoef * (runratio - averatio);
+  );
+  overdb = rundb;
+  averatio = runratio;
+
+  allin ? (
+    cratio = 12 + averatio;
+  ) : (
+    cratio = ratio;
+  );
+  
+  gr = -overdb * (cratio-1)/cratio;
+  grv = exp(gr * db2log);
+  
+  runmax = maxover + relcoef * (runmax - maxover);  // highest peak for setting att/rel decays in reltime
+  maxover = runmax;
+
+  grv < gr_meter ? gr_meter=grv : ( gr_meter*=gr_meter_decay; gr_meter>1?gr_meter=1; );
+
+  spl0 *= grv * makeupv * mix;
+  spl1 *= grv * makeupv * mix;  
+  
+  spl0 += (ospl0 * (1-mix)*(-1));
+  spl1 += (ospl1 * (1-mix)*(-1));
+  
+  spl0 = spl0*2*gainout*(-1);
+  spl1 = spl1*2*gainout*(-1);
+
+
+@gfx 448 230
+
+gfx_clear=cRed+cGreen*256+cBlue*65536;
+
+gfx_setfont(1,"Arial",14,0);
+
+//display background bitmap
+gfx_blit(0,0.5,0,0,0,448,230,0,0,448,230,0,0);
+
+//determine which control we're on (if any)
+mouse_cap == 0 ? (
+	slastyt = 0;	
+	slasty = 0;
+  mouse_x > 22 && mouse_x < 100 && mouse_y > 30 && mouse_y < 102 ? (mouseon = 1; val = 1.5);
+  mouse_x > 160 && mouse_x < 217 && mouse_y > 37 && mouse_y < 93 ? (mouseon = 2; val = 1);
+  
+  mouse_x > 272 && mouse_x < 322 && mouse_y > 37 && mouse_y < 93 ? (mouseon = 6; val = 24.5);
+):(
+  mouse_cap == 4 ? val = val*4;
+  mouse_cap == 17 ? val = 5;
+);
+
+gfx_r=gfx_g=gfx_b=0;
+//do the Threshold knob
+mouseon == 1 ? (
+  mouse_cap > 0 ? ( 
+  	diff = (abs(slastyt - saveY)/3);
+    mouse_y > saveY ? slider1 = max(-60,slider1 - diff);
+    mouse_y < saveY ? slider1 = min(0,slider1 + diff);
+    mouse_cap == 2 ? slider1 = -60;
+):(
+    slider1 = doMouseWheel(slider1,-60,0,val);
+  );
+    slastyt = saveY; saveY = mouse_y;
+);
+gfx_blit(2,1,slider1 * 0.075-1.65,0,0,81,81,44,36,59,59,0,0);
+doCenterText(74,110, slider1);
+
+
+//do the Gain knob
+mouseon == 2 ? (
+  mouse_cap > 0 ? (
+  	diff = (abs(slasty - saveY)/5);
+    mouse_y > saveY ? slider6 = max(-20,slider6 - diff);
+    mouse_y < saveY ? slider6 = min(20,slider6 + diff);
+    mouse_cap == 2 ? slider6 = 0;
+ 
+ ):(
+  slider6 = doMouseWheel(slider6,-20,20,val);
+  );
+   slasty = saveY; saveY = mouse_y;
+);
+
+gfx_blit(1,1,slider6 * 0.115-3.9,0,0,81,81,160,36,59,59,0,0);
+doCenterText(188,110, slider6);
+
+
+
+//do the Release slider Rotation
+mouseon == 6 ? (
+  mouse_cap > 0 ? (
+     mouse_y > saveY ? slider5 = max(20,slider5 -(abs(slasty - saveY)*5));
+    mouse_y < saveY ? slider5 = min(1000,slider5 +(abs(slasty - saveY)*5));
+    mouse_cap == 2 ? slider5 = 612.1;  
+
+ ):(
+    slider5 = doMouseWheel(slider5,20,1000,val);
+  );
+    slasty = saveY; saveY = mouse_y;
+    );
+
+gfx_blit(1,1,slider5 * 0.004591,0,0,81,81,272,36,59,59,0,0);
+doCenterText(300,110, relslider5);
+
+
+
+/*do the Release slider Horizontal
+mouseon == 6 ? (
+  mouse_cap > 0 ? (
+    slider5 = max(20,min((mouse_x - 292)*7.73,1000));
+    mouse_cap == 2 ? slider5 = 250;      
+  ):(
+    slider5 = doMouseWheel(slider5,20,1000,val);
+  );
+);
+gfx_blit(0,1,0,96,288,20,30,282 + slider5*.1292,96,20,30,-96,-288);
+doCenterText(388,89, slider5); */
+
+//do the meter
+  gr_meter *= exp(1/30); gr_meter>1?gr_meter=1; // decay meter here so if the audio processing stops it doesnt "stick"
+  gfx_r=0;gfx_g=0;gfx_b=0.6; gfx_a=1;
+  
+  meter_bot=20;
+  xscale=gfx_w*20/meter_bot;
+  gfx_y=150;
+  gfx_x=max(425 + log10(gr_meter)*xscale,25);
+  gfx_rectto(425,170);
+/*
+  gfx_r=gfx_g=gfx_b=0;
+  gfx_a=1;
+  gfx_x=390; gfx_y=176;
+ doCenterText(388,180, spl0);
+  gfx_drawnumber(log10(gr_meter)*(-1)*20,1);
+*/
+//Call function to execute code that was originally in @slider section
+  doslidercode();
+  
+ 

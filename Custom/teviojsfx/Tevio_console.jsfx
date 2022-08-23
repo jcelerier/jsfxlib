@@ -1,0 +1,233 @@
+desc:Tevio Console
+Author: Tevio
+version: 2018/06/25
+changelog: Initial release
+Author URI: 
+Repository: 
+Repository URI:
+
+
+slider1:0<0,100,1>Drive (%)
+slider2:0<0,1000,10>Hpf
+slider3:22000<1000,22000,100>Lpf
+slider4:12<3,12,0.01>Volts
+slider6:0<0,100,0.1>Channel 2
+slider5:0<0,100,0.1>Channel 1
+slider7:0<-20,20,0.1>Gain
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+
+ hpf = 0;
+  gain1 = 0;
+  freq1 = slider2;
+  a1 = 1;
+  s1 = 1;
+  q1 = 1 / (sqrt((a1 + 1/a1)*(1/s1 - 1) + 2));
+  w01 = 2 * $pi * freq1/srate;
+  cosw01 = cos(w01);
+  sinw01 = sin(w01);
+  alpha1 = sinw01 / (2 * q1);
+
+  b01 = (1 + cosw01)/2;
+  b11 = -(1 + cosw01);
+  b21 = (1 + cosw01)/2;
+  a01 = 1 + alpha1;
+  a11 = -2 * cosw01;
+  a21 = 1 - alpha1;
+  b01 /= a01;
+  b11 /= a01;
+  b21 /= a01;
+  a11 /= a01;
+  a21 /= a01;
+
+  lpf = 0;
+  gain3 = 0;
+  freq3 = 22000;
+  a3 = 10^(gain3/40);
+  s3 = 2;
+  q3 = 1 / (sqrt((a3 + 1/a3)*(1/s3 - 1) + 2));
+  w03 = 2 * $pi * freq3/srate;
+  cosw03 = cos(w03);
+  sinw03 = sin(w03);
+  alpha3 = sinw03 / (2 * q3);
+
+  b03 = (1 - cosw03)/2;
+  b13 = (1 - cosw03);
+  b23 = (1 - cosw03)/2;
+  a03 = 1 + alpha3;
+  a13 = -2 * cosw03;
+  a23 = 1 - alpha3;
+  b03 /= a03;
+  b13 /= a03;
+  b23 /= a03;
+  a13 /= a03;
+  a23 /= a03;
+
+  gain = 1;
+  
+@slider
+
+freq1 = slider2;
+  freq3 = slider3;
+  gain = 10^(slider7/20);
+
+  slider2 == 0 ? hpf = 0 : hpf = 1;
+  slider3 == 22000 ? lpf = 0 : lpf = 1;
+
+  a1 = 1;
+  s1 = 1;
+  q1 = 1 / (sqrt((a1 + 1/a1)*(1/s1 - 1) + 2));
+  w01 = 2 * $pi * freq1/srate;
+  cosw01 = cos(w01);
+  sinw01 = sin(w01);
+  alpha1 = sinw01 / (2 * q1);
+
+  b01 = (1 + cosw01)/2;
+  b11 = -(1 + cosw01);
+  b21 = (1 + cosw01)/2;
+  a01 = 1 + alpha1;
+  a11 = -2 * cosw01;
+  a21 = 1 - alpha1;
+  b01 /= a01;
+  b11 /= a01;
+  b21 /= a01;
+  a11 /= a01;
+  a21 /= a01;
+
+  a3 = 1;
+  s3 = 1;
+  q3 = 1 / (sqrt((a3 + 1/a3)*(1/s3 - 1) + 2));
+  w03 = 2 * $pi * freq3/srate;
+  cosw03 = cos(w03);
+  sinw03 = sin(w03);
+  alpha3 = sinw03 / (2 * q3);
+
+  b03 = (1 - cosw03)/2;
+  b13 = (1 - cosw03);
+  b23 = (1 - cosw03)/2;
+  a03 = 1 + alpha3;
+  a13 = -2 * cosw03;
+  a23 = 1 - alpha3;
+  b03 /= a03;
+  b13 /= a03;
+  b23 /= a03;
+  a13 /= a03;
+  a23 /= a03;
+  
+ volts=(slider4*6.6)*(-1);
+ pt=volts;
+  nt=volts;
+  pl=1.6-1;
+  nl=1.6-1;
+  mixa=slider6/100;
+  mixb=slider5/100;
+  drivea=1;
+  mixa1 = 1 - mixa;
+  drivea1 = 1 / (1 - (drivea / 2));
+  drivea2 = drive / 2;
+  mixb1 = 1 - mixb;
+  pts=0;
+  nts=0;
+  ptt=pt - pts;
+  ntt=nt - nts;
+
+  ptsv=exp(ptt * db2log);
+  ntsv=-exp(ntt * db2log);
+  
+foo=slider1/200*$pi;
+bar = sin(slider1/200*$pi);
+  log2db = 8.6858896380650365530225783783321; // 20 / ln(10)
+  db2log = 0.11512925464970228420089957273422; // ln(10) / 20 
+  pi = 3.1415926535;
+  halfpi = pi / 2;  
+
+
+@sample
+
+slider1 ? (
+spl0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+);
+
+ hpf != 0 ? (
+  ospl0 = spl0;
+  spl0 = b01 * spl0 + b11 * xl11 + b21 * xl21 - a11 * yl11 - a21 * yl21;
+  xl21 = xl11;
+  xl11 = ospl0;
+  yl21 = yl11;
+  yl11 = spl0;
+
+  ospl1 = spl1;
+  spl1 = b01 * spl1 + b11 * xr11 + b21 * xr21 - a11 * yr11 - a21 * yr21;
+  xr21 = xr11;
+  xr11 = ospl1;
+  yr21 = yr11;
+  yr11 = spl1;
+  );
+
+  lpf != 0 ? (
+  ospl0 = spl0;
+  spl0 = b03 * spl0 + b13 * xl13 + b23 * xl23 - a13 * yl13 - a23 * yl23;
+  xl23 = xl13;
+  xl13 = ospl0;
+  yl23 = yl13;
+  yl13 = spl0;
+
+  ospl1 = spl1;
+  spl1 = b03 * spl1 + b13 * xr13 + b23 * xr23 - a13 * yr13 - a23 * yr23;
+  xr23 = xr13;
+  xr13 = ospl1;
+  yr23 = yr13;
+  yr13 = spl1;
+  );
+
+  spl0 *= gain;
+  spl1 *= gain;
+
+ mixa > 0 ? (
+    wet0 = drivea1 * spl0 * (1 - abs(spl0 * drivea2));
+    wet1 = drivea1 * spl1 * (1 - abs(spl1 * drivea2)); 
+    spl0 = mixa1 * spl0 + (mixa) * wet0;
+    spl1 = mixa1 * spl1 + (mixa) * wet1;  
+  );
+  
+  mixb > 0 ? (
+    wet0 = sin(spl0 * halfpi);
+    wet1 = sin(spl1 * halfpi); 
+    spl0 = mixb1 * spl0 + (mixb) * wet0;
+    spl1 = mixb1 * spl1 + (mixb) * wet1;  
+  );
+
+  db0 = log(abs(spl0)) * log2db;
+  db1 = log(abs(spl1)) * log2db;
+
+  spl0>ptsv ? (
+    diff=max(min((db0 - ptt),0),pts);
+    pts == 0 ? mult = 0 : mult=diff/pts;
+    spl0 = ptsv + ((spl0 - ptsv) / (1 + (pl * mult)));
+  );
+  spl0<ntsv ? (
+    diff=max(min((db0 - ntt),0),nts);
+    nts == 0 ? mult = 0 : mult=diff/nts;
+    spl0 = ntsv + ((spl0 - ntsv) / (1 + (nl * mult)));
+  );
+  spl1>ptsv ? (
+    diff=max(min((db1 - ptt),0),pts);
+    pts == 0 ? mult = 0 : mult=diff/pts;
+    spl1 = ptsv + ((spl1 - ptsv) / (1 + (pl * mult)));
+  );
+  spl1<ntsv ? (
+    diff=max(min((db1 - ntt),0),nts);
+    nts == 0 ? mult = 0 : mult=diff/nts;
+    spl1 = ntsv + ((spl1 - ntsv) / (1 + (nl * mult)));
+  );
+
+  
+
+
+

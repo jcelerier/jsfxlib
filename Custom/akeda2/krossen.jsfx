@@ -1,0 +1,53 @@
+desc: 2 stereo track mixer with crossfader
+
+slider1:0<-90,10,0.1>Track 1 (channel 1,2) (dB)
+slider2:0<-90,10,0.1>Track 2 (channel 3,4) (dB)
+slider3:0<-40,40,0.1>Crossfade
+slider4:0<-90,6,0.1>Gain/pad
+
+in_pin:Track1-L;
+in_pin:Track1-R;
+in_pin:Track2-L;
+in_pin:Track2-R;
+out_pin:Left;
+out_pin:Right;
+
+@init
+gainMax = 10;
+gainMin = -90;
+sliderPos = 0;
+gainpad = 0;
+
+@slider
+slider1 < gainMin ? slider1 = gainMin;
+slider1 > gainMax ? slider1 = gainMax;
+levelT1 = 2 ^ ( slider1 / 6 );
+
+slider2 < gainMin ? slider2 = gainMin;
+slider2 > gainMax ? slider2 = gainMax;
+levelT2 = 2 ^ ( slider2 / 6 );
+
+slider3 < -40 ? slider3 = -40;
+slider3 > 40 ? slider3 = 40;
+
+mixPercent = slider3;
+mixPercent == 40 ? mixPercent = 100;
+mixPercent == -40 ? mixPercent = -100;
+
+slider3 <= 0 ?
+(
+crossT1 = 1;
+crossT2 = 2 ^ ( mixPercent/ 6 );
+) :
+(
+crossT1 = 2 ^ ( -mixPercent / 6 );
+crossT2 = 1;
+);
+gainpad =  10^(slider4/20);
+
+@sample
+// left mix
+spl0 = ((spl0 * levelT1 * crossT1) + (spl2 * levelT2 * crossT2))*gainpad;
+
+// right mix
+spl1 = ((spl1 * levelT1 * crossT1) + (spl3 * levelT2 * crossT2))*gainpad; 

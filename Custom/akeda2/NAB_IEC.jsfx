@@ -1,0 +1,157 @@
+desc:IEC - NAB de/re-emphasis - for tapes played on a misconfigured playback machine
+
+/*
+The NAB eq curve, used in North America, employs time constants of 3183 usec (50 Hz) for the bass,
+ & 50 usec (3183 Hz) for the treble, at speeds of 7.5 & 15 ips, in playback mode. This spec originated
+  in the early 1950's, when tapes had less hf capability, & bass boost in recording was employed at 50 Hz
+   to avoid lf rumble during playback.
+
+The IEC curve came a little later & is, IMHO, a curve which better matches & better utilizes the benefits
+ of improved tapes. It uses an infinite time constant in the bass end (0 Hz), & a 35 usec (4547 Hz) time
+  constant in the treble region at 15 ips speed. At 7.5 ips, bass is the same, but the treble time constant
+   is 70 usec (2274 Hz). Again, IEC eq provides less treble boost in playback (at 15 ips speed), realizing
+    a slight improvement in s/n ratio over NAB eq. The difference is about 1.0 to 1.5 dB. At 7.5 ips speed,
+     NAB provides less treble boost & a little better snr, 1.0 to 1.5 dB.
+
+A tape recorded at 15 ips w/ NAB eq & played back w/ IEC eq, will likely sound a little deficient in the treble,
+ as well as in the deep bass. But the amount is not that great, like I said a dB or so. A tape recorded in IEC,
+  then played back in NAB will have slightly boosted treble & bass. The freq response is not flat this way, but
+   there will always be some listeners who prefer boosted sound at the bass & treble regions.
+
+If the recording speed was 7.5 ips, then IEC provides more playback treble boost than NAB. So the treble respons
+e will vary in the opposite direction as above, but still a small difference. Bass remains the same as above.
+
+If "flat" is the objective, then I recommend playing back w/ the same eq curve used during recording. Still,
+ the difference is pretty slim, & if the right curve is not available, a parametric or graphic outboard eq can
+  restore flat response. Use the break frequencies given above & all should be well. Again, if an outboard eq
+   is not available either, no big deal. The deviation from flat response is too scant to be concerned about. I hope I've helped. BR.
+*/
+
+import cookdsp.jsfx-inc
+
+slider1:1<0,2,1{off,IEC,NAB}>De-de-emphasis (playback eq to remove)
+slider2:1<0,2,1{off,IEC,NAB}>Re-de-emphasis (original eq to match)
+slider3:0<0,1,1{6dB,shelf}>Filter type (for debug)
+/*
+//slider3:0<0,100,1>parameter3
+//slider4:0<0,100,1>parameter4
+//slider5:0<0,100,1>parameter5
+*/
+@init
+bpos=0;
+IECl = 1;
+IECh = 4547;
+NABl = 50;
+NABh = 3183;
+
+//eq(freq, q, boost, type)
+// - 0 : peak/notch
+// - 1 : lowshelf
+// - 2 : highshelf
+
+slider1 != 0 ? (
+  slider1 == 1 ? (dlow = IECl; dhigh = IECh;)
+  ) : (dlow = NABl; dhigh = NABh;
+);
+slider2 != 0 ? (
+  slider2 == 1 ? (elow = IECl; ehigh = IECh;)
+  ) : (elow = NABl; ehigh = NABh;
+);
+
+//Left
+//de-deemph
+Ldlow.eq(dlow, 0.1, 6, 1);
+Ldhigh.eq(dhigh, 0.1, -6, 2);
+//re-deemph
+Lelow.eq(elow, 0.1, -6, 1);
+Lehigh.eq(ehigh, 0.1, 6, 2);
+
+//Right
+//de-deemph
+Rdlow.eq(dlow, 0.1, 6, 1);
+Rdhigh.eq(dhigh, 0.1, -6, 2);
+//re-deemph
+Relow.eq(elow, 0.1, -6, 1);
+Rehigh.eq(ehigh, 0.1, 6, 2);
+
+//First order filters
+//de-deemph
+Ldl6.hip(dlow);
+Rdl6.hip(dlow);
+Ldh6.hip(dhigh);
+Rdh6.hip(dhigh);
+//Re-deemph
+Lel6.lop(elow);
+Rel6.lop(elow);
+Leh6.lop(ehigh);
+Reh6.lop(ehigh);
+
+
+@slider
+something=slider1*srate;
+
+slider1 != 0 ? (
+  slider1 == 1 ? (dlow = IECl; dhigh = IECh;
+  ) : (dlow = NABl; dhigh = NABh;)
+  );
+slider2 != 0 ? (
+  slider2 == 1 ? (elow = IECl; ehigh = IECh;
+  ) : (elow = NABl; ehigh = NABh;)
+  );
+
+//de-deemph
+Ldlow.eq_set_freq(dlow);
+Ldhigh.eq_set_freq(dhigh);
+Lelow.eq_set_freq(elow);
+Lehigh.eq_set_freq(ehigh);
+//re-deemph
+Rdlow.eq_set_freq(dlow);
+Rdhigh.eq_set_freq(dhigh);
+Relow.eq_set_freq(elow);
+Rehigh.eq_set_freq(ehigh);
+
+//de-deemph
+Ldl6.lop_set_freq(dlow);
+Rdl6.lop_set_freq(dlow);
+Ldh6.lop_set_freq(dhigh);
+Rdh6.lop_set_freq(dhigh);
+//Re-deemph
+Lel6.hip_set_freq(elow);
+Rel6.hip_set_freq(elow);
+Leh6.hip_set_freq(ehigh);
+Reh6.hip_set_freq(ehigh);
+
+
+
+@block
+blah+=samplesblock;
+
+@sample
+//De-deemph
+slider1 != 0 ? (
+  slider3 !== 1 ? (
+    spl0=Ldlow.eq_do(Ldhigh.eq_do(spl0));
+    spl1=Rdlow.eq_do(Rdhigh.eq_do(spl1));
+  ) : (
+    Lhigh = Ldh6.lop_do(spl0);
+    Llow = Ldl6.lop_do(spl0);
+    spl0 = Llow+(Lhigh*0.5);
+    Rhigh = Rdh6.lop_do(spl1);
+    Rlow = Rdl6.lop_do(spl1);
+    spl1 = Rlow+(Rhigh*0.5);
+  );
+);
+//Re-deemph
+slider2 != 0 ? (
+  slider3 !== 1 ? (
+    spl0=Lelow.eq_do(Lehigh.eq_do(spl0));
+    spl1=Relow.eq_do(Rehigh.eq_do(spl1));
+  ) : (
+    Lrhigh = Leh6.hip_do(spl0);
+    Lrlow = Lel6.hip_do(spl0);
+    spl0 = 8*(Lrhigh+(Lrlow*0.5));
+    Rrhigh = Reh6.hip_do(spl1);
+    Rrlow = Rel6.hip_do(spl1);
+    spl1 = 8*(Rrhigh+(Rrlow*0.5));
+  );
+);

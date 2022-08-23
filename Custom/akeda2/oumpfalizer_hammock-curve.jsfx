@@ -1,0 +1,68 @@
+desc:Oumphilizer eq
+
+import cookdsp.jsfx-inc
+
+slider1:80<60,140,0.5>Disco-hump (Hz)
+slider2:0<0,24,0.5>(dB)
+slider3:3500<2000,7000,1>Hammock/prescence midrange smiley-curve (Hz)
+slider4:0<-12,12,0.5>Hängmatta sag/boost (dB)
+slider5:20000<8000,20000,1>Treble round-off (Hz)
+//slider6:0<0,100,1>parameter5
+
+@init
+bpos=0;
+
+//Disco-hump
+LDH.eq(slider1,1,slider2,0);
+RDH.eq(slider1,1,slider2,0);
+//Hammock
+LH.eq(slider3,0.2,slider4,0);
+RH.eq(slider3,0.2,slider4,0);
+//Treble cut
+LHC.lop(slider5);
+RHC.lop(slider5);
+
+@slider
+something=slider1*srate;
+
+//Disco-hump
+LDH.eq_set_freq(slider1);
+RDH.eq_set_freq(slider1);
+LDH.eq_set_boost(slider2);
+RDH.eq_set_boost(slider2);
+//Hammock
+LH.eq_set_boost(slider4);
+RH.eq_set_boost(slider4);
+LH.eq_set_freq(slider3);
+RH.eq_set_freq(slider3);
+//Treble cut
+LHC.lop_set_freq(slider5);
+RHC.lop_set_freq(slider5);
+
+@block
+blah+=samplesblock;
+
+@sample
+
+//Disco
+slider2 != 0 ? (
+ spl0 = LDH.eq_do(spl0);
+ spl1 = RDH.eq_do(spl1);
+ );
+
+//Hammock
+slider4 != 0 ? (
+ spl0 = LH.eq_do(spl0);
+ spl1 = RH.eq_do(spl1);
+ );
+
+//Treblecut
+slider5 != 20000 ? (
+ spl0 = LHC.lop_do(spl0);
+ spl1 = RHC.lop_do(spl1);
+ );
+
+
+spl0=spl0;
+spl1=spl1;
+

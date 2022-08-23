@@ -1,0 +1,74 @@
+desc:Oversampled saturation, w/o graphics - for hacking
+
+slider1:0<0,100,1>Amount (%)
+slider2:1<0,1,1{off,on}>Oversampling
+
+//import wuff/st-oversampler.jsfx-inc
+import wuff/oversampler.jsfx-inc
+
+@init
+gfx_clear = 0;
+
+function saturate(x)
+(
+  x = min(max( sin(max(min(x,1),-1)*foo)/bar ,-1) ,1);
+);
+
+
+@slider
+foo=slider1/200*$pi;
+bar = sin(slider1/200*$pi);
+
+@sample
+//osL.os_up2();
+//osR.os_up2();
+//osL.os_up2(spl0);
+//osR.os_up2(spl1);
+
+//spl0 = left.process2(spl0);
+//spl1 = right.process2(spl1);
+
+//spl0=spl1=glenn;
+//osL.y1 = osL.y0 = spl0;
+//osR.y1 = osR.y0 = spl1;
+
+slider2 == 1 ? (
+  slider1 ? (
+  os0.os_up2(spl0);
+  os1.os_up2(spl1);
+  os0.y1 = saturate(os0.y1);
+  os0.y0 = saturate(os0.y0);
+  os1.y1 = saturate(os1.y1);
+  os1.y0 = saturate(os1.y0);
+  /*
+  spl0=os0.y1;
+  spl1=os1.y1;
+  slider1 ? (
+    g=0;
+    loop(2,
+      spl(g) = saturate(spl(g));
+    
+    //min(max( sin(max(min(osL.y1,1),-1)*foo)/bar ,-1) ,1);
+    //osL.y0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+    //osR.y1 = saturate(osR.y1);//min(max( sin(max(min(osR.y1,1),-1)*foo)/bar ,-1) ,1);
+    //osR.y0 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+      
+      
+      g+=1;
+      );
+      os0.y1=spl0;
+      os1.y1=spl1;*/
+    spl0=os0.os_down2();
+    spl1=os1.os_down2();
+    )
+  ) : (
+slider1 ? (
+  //L = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+  //R = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+  c=0;loop(num_ch,
+    spl(c) = saturate(spl(c));
+    //spl1 = saturate(spl1);
+    c+=1;
+  );
+  )
+);

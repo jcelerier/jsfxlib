@@ -1,0 +1,65 @@
+/*
+ Nicholas Lenz
+ Github : nicholaslenz12@gmail.com
+
+ Basic decimator plugin. Reduces the bit-depth of a signal anywhere to
+ 1 to 16 bits. Also, the sample hold length can be extended.
+
+ Implemenation based on code provided here:
+ http://www.musicdsp.org/en/latest/Effects/139-lo-fi-crusher.html
+ */
+
+desc:Bitcrusher
+
+// ----------------------------------------------------------------------------
+// SLIDER DEFINITIONS
+// ----------------------------------------------------------------------------
+slider1:16<1,16,0.1>Bits
+slider2:1<0.01,1,0.001>Frequency
+
+// ----------------------------------------------------------------------------
+// DEFAULT CHANNEL CONFIGURATION
+// ----------------------------------------------------------------------------
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+// ----------------------------------------------------------------------------
+// INIT
+// ----------------------------------------------------------------------------
+@init
+cycle_pos = 0;
+l = 0;
+r = 0;
+
+// ----------------------------------------------------------------------------
+// SLIDER
+// ----------------------------------------------------------------------------
+@slider
+val = 2^(10*(1-slider2));
+bits = slider1;
+cycle_length = (val|0)-1; // hold length
+granularity = 1/((2^bits)|0); // reciprocal of new bit depth
+
+
+// ----------------------------------------------------------------------------
+// SAMPLE
+// ----------------------------------------------------------------------------
+@sample
+// at beginning of hold set value of current sample to nearest value allowed
+// by new bit depth
+cycle_pos == 0 ?
+(
+    l = granularity*((spl0/granularity + 0.5)|0);
+    r = granularity*((spl1/granularity + 0.5)|0);
+);
+
+// hold values until cycle reset
+spl0 = l;
+spl1 = r;
+
+(cycle_pos += 1) > cycle_length ? cycle_pos = 0; // reset cycle position
+
+@gfx 200 200
+gfx_rect(0,0,1,1);

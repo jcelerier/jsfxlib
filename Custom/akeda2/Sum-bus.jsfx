@@ -1,0 +1,437 @@
+desc:8/16ch Summing bus with "authentic" vintage warm analog transformer saturation and valve magic
+//tags: summing mixer saturation clipping authentic analog vintage magic expensive
+//author: Akeda
+
+import cookdsp.jsfx-inc
+
+slider6:-24<-60,18,0.5>Pre/de-emphasis curve(dB, neg or pos)
+slider7:2500<1000,7000,1>Pre/de-emphasis center frequency (Hz)
+slider8:1<1,1.7,0.01>Pre/de-emphasis center mismatch (bass boost) (Hz)
+
+slider10:80<1,100,1>Input(16ch) saturation (%)
+slider15:18<0,32,0.1>Global(16ch) input-amps drive (dB)
+slider16:-6<-12,0,0.1>Input-amps Soft clipping ceiling (dB)
+
+slider21:0<-60,6,0.1>Mixer level (dB) 1/2
+slider22:0<-60,6,0.1>3/4
+slider23:0<-60,6,0.1>5/6
+slider24:0<-60,6,0.1>7/8
+slider25:0<-60,6,0.1>9/10
+slider26:0<-60,6,0.1>11/12
+slider27:0<-60,6,0.1>13/14
+slider28:0<-60,6,0.1>15/16
+
+slider30:0<-60,20,0.1>MASTER output stage gain/pad (dB)
+slider35:0<0,24,0.1>Output stage crosstalk/bleed (dB)
+
+slider45:3<0,32,0.1>Output-amp drive (dB)
+slider46:-3<-6,0,0.1>Output-amp Soft clipping ceiling (dB)
+
+slider48:80<1,100,1>Output (2ch)saturation (%)
+slider49:12000<1000,18000>12dB/oct Lowpass freq(Hz)
+slider50:0<-12,6,0.1>Output trim(2ch) gain/pad (dB)
+
+in_pin:Input 1
+in_pin:Input 2
+in_pin:Input 3
+in_pin:Input 4
+in_pin:Input 5
+in_pin:Input 6
+in_pin:Input 7
+in_pin:Input 8
+in_pin:Input 9
+in_pin:Input 10
+in_pin:Input 11
+in_pin:Input 12
+in_pin:Input 13
+in_pin:Input 14
+in_pin:Input 15
+in_pin:Input 16
+
+out_pin:left output
+out_pin:right output
+
+@init
+bpos=0;
+gainMin = -60;
+gainMax = 30;
+itm1=itm2=otm1=otm2=0;
+
+//Low-pass
+Llp.butlp(slider49);
+Rlp.butlp(slider49);
+
+
+//Pre-emphasis
+pe1.eq(slider7,0.1,slider6,0);
+pe2.eq(slider7,0.1,slider6,0);
+pe3.eq(slider7,0.1,slider6,0);
+pe4.eq(slider7,0.1,slider6,0);
+pe5.eq(slider7,0.1,slider6,0);
+pe6.eq(slider7,0.1,slider6,0);
+pe7.eq(slider7,0.1,slider6,0);
+pe8.eq(slider7,0.1,slider6,0);
+pe9.eq(slider7,0.1,slider6,0);
+pe10.eq(slider7,0.1,slider6,0);
+pe11.eq(slider7,0.1,slider6,0);
+pe12.eq(slider7,0.1,slider6,0);
+pe13.eq(slider7,0.1,slider6,0);
+pe14.eq(slider7,0.1,slider6,0);
+pe15.eq(slider7,0.1,slider6,0);
+pe16.eq(slider7,0.1,slider6,0);
+
+peL.eq(slider7,0.1,slider6,0);
+peR.eq(slider7,0.1,slider6,0);
+
+//De-emphasis
+de1.eq(slider7,0.1,-slider6,0);
+de2.eq(slider7,0.1,-slider6,0);
+de3.eq(slider7,0.1,-slider6,0);
+de4.eq(slider7,0.1,-slider6,0);
+de5.eq(slider7,0.1,-slider6,0);
+de6.eq(slider7,0.1,-slider6,0);
+de7.eq(slider7,0.1,-slider6,0);
+de8.eq(slider7,0.1,-slider6,0);
+de9.eq(slider7,0.1,-slider6,0);
+de10.eq(slider7,0.1,-slider6,0);
+de11.eq(slider7,0.1,-slider6,0);
+de12.eq(slider7,0.1,-slider6,0);
+de13.eq(slider7,0.1,-slider6,0);
+de14.eq(slider7,0.1,-slider6,0);
+de15.eq(slider7,0.1,-slider6,0);
+de16.eq(slider7,0.1,-slider6,0);
+
+deL.eq((slider7*slider8),0.1,-slider6,0);
+deR.eq((slider7*slider8),0.1,-slider6,0);
+
+
+//Soft clipper
+nominal = 0.5;
+function tanh(x) (exp(x)-exp(-x)) / (exp(x)+exp(-x));
+
+@slider
+something=slider1*srate;
+
+//Pre-emphasis
+pe1.eq_set_freq(slider7);
+pe2.eq_set_freq(slider7);
+pe3.eq_set_freq(slider7);
+pe4.eq_set_freq(slider7);
+pe5.eq_set_freq(slider7);
+pe6.eq_set_freq(slider7);
+pe7.eq_set_freq(slider7);
+pe8.eq_set_freq(slider7);
+pe9.eq_set_freq(slider7);
+pe10.eq_set_freq(slider7);
+pe11.eq_set_freq(slider7);
+pe12.eq_set_freq(slider7);
+pe13.eq_set_freq(slider7);
+pe14.eq_set_freq(slider7);
+pe15.eq_set_freq(slider7);
+pe16.eq_set_freq(slider7);
+
+peL.eq_set_freq(slider7*slider8);
+peR.eq_set_freq(slider7*slider8);
+
+pe1.eq_set_boost(slider6);
+pe2.eq_set_boost(slider6);
+pe3.eq_set_boost(slider6);
+pe4.eq_set_boost(slider6);
+pe5.eq_set_boost(slider6);
+pe6.eq_set_boost(slider6);
+pe7.eq_set_boost(slider6);
+pe8.eq_set_boost(slider6);
+pe9.eq_set_boost(slider6);
+pe10.eq_set_boost(slider6);
+pe12.eq_set_boost(slider6);
+pe13.eq_set_boost(slider6);
+pe14.eq_set_boost(slider6);
+pe15.eq_set_boost(slider6);
+pe16.eq_set_boost(slider6);
+
+peL.eq_set_boost(slider6);
+peR.eq_set_boost(slider6);
+
+//De-emphasis
+de1.eq_set_freq(slider7);
+de2.eq_set_freq(slider7);
+de3.eq_set_freq(slider7);
+de4.eq_set_freq(slider7);
+de5.eq_set_freq(slider7);
+de6.eq_set_freq(slider7);
+de7.eq_set_freq(slider7);
+de8.eq_set_freq(slider7);
+de9.eq_set_freq(slider7);
+de10.eq_set_freq(slider7);
+de11.eq_set_freq(slider7);
+de12.eq_set_freq(slider7);
+de13.eq_set_freq(slider7);
+de14.eq_set_freq(slider7);
+de15.eq_set_freq(slider7);
+de16.eq_set_freq(slider7);
+
+deL.eq_set_freq(slider7);
+deR.eq_set_freq(slider7);
+
+de1.eq_set_boost(-slider6);
+de2.eq_set_boost(-slider6);
+de3.eq_set_boost(-slider6);
+de4.eq_set_boost(-slider6);
+de5.eq_set_boost(-slider6);
+de6.eq_set_boost(-slider6);
+de7.eq_set_boost(-slider6);
+de8.eq_set_boost(-slider6);
+de9.eq_set_boost(-slider6);
+de10.eq_set_boost(-slider6);
+de11.eq_set_boost(-slider6);
+de12.eq_set_boost(-slider6);
+de13.eq_set_boost(-slider6);
+de14.eq_set_boost(-slider6);
+de15.eq_set_boost(-slider6);
+de16.eq_set_boost(-slider6);
+
+deL.eq_set_boost(-slider6);
+deR.eq_set_boost(-slider6);
+
+
+//Input-amp Soft clipper
+gain = 2^(slider15/6) * nominal;
+ceiling = 10^(slider16/20);
+// Scalar to get output of tanh(x) to -1..1 bounds regardless of the gain:
+invGain = 1/(tanh(gain));
+
+//Output-amp Soft clipper
+o_gain = 2^(slider45/6) * nominal;
+o_ceiling = 10^(slider46/20);
+// Scalar to get output of tanh(x) to -1..1 bounds regardless of the gain:
+o_invGain = 1/(tanh(o_gain));
+
+slider21 = min(max(slider21, gainMin), gainMax);
+slider22 = min(max(slider22, gainMin), gainMax);
+slider23 = min(max(slider23, gainMin), gainMax);
+slider24 = min(max(slider24, gainMin), gainMax);
+slider25 = min(max(slider25, gainMin), gainMax);
+slider26 = min(max(slider26, gainMin), gainMax);
+slider27 = min(max(slider27, gainMin), gainMax);
+slider28 = min(max(slider28, gainMin), gainMax);
+
+levelA = 2 ^ (slider21 / 6);
+levelB = 2 ^ (slider22 / 6);
+levelC = 2 ^ (slider23 / 6);
+levelD = 2 ^ (slider24 / 6);
+levelE = 2 ^ (slider25 / 6);
+levelF = 2 ^ (slider26 / 6);
+levelG = 2 ^ (slider27 / 6);
+levelH = 2 ^ (slider28 / 6);
+
+slider30 = min(max(slider30, gainMin), gainMax);
+L_Mlevel = 2 ^ (slider30 / 6);
+R_Mlevel = 2 ^ (slider30 / 6);
+
+//Crosstalk
+crosstalk = 2 ^ (-slider35 / 6);
+
+slider50 = min(max(slider50, gainMin), gainMax);
+L_level = 2 ^ (slider50 / 6);
+R_level = 2 ^ (slider50 / 6);
+
+//Saturation
+//Input
+foo = slider10/200*$pi;
+bar = sin(slider10/200*$pi);
+//Output
+foo2 = slider48/200*$pi;
+bar2 = sin(slider48/200*$pi);
+
+//Lowpass
+Llp.butlp_set_freq(slider49);
+Rlp.butlp_set_freq(slider49);
+
+@block
+blah+=samplesblock;
+
+@sample
+
+slider6 != 0 ? (
+ spl0 = pe1.eq_do(spl0);
+ spl1 = pe2.eq_do(spl1);
+ spl2 = pe3.eq_do(spl2);
+ spl3 = pe4.eq_do(spl3);
+ spl4 = pe5.eq_do(spl4);
+ spl5 = pe6.eq_do(spl5);
+ spl6 = pe7.eq_do(spl6);
+ spl7 = pe8.eq_do(spl7);
+ spl8 = pe9.eq_do(spl8);
+ spl9 = pe10.eq_do(spl9);
+ spl10 = pe11.eq_do(spl10);
+ spl11 = pe12.eq_do(spl11);
+ spl12 = pe13.eq_do(spl12);
+ spl13 = pe14.eq_do(spl13);
+ spl14 = pe15.eq_do(spl14);
+ spl15 = pe16.eq_do(spl15);
+);
+
+//Input saturation
+slider10 ? (
+spl0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+spl2 = min(max( sin(max(min(spl2,1),-1)*foo)/bar ,-1) ,1);
+spl3 = min(max( sin(max(min(spl3,1),-1)*foo)/bar ,-1) ,1);
+spl4 = min(max( sin(max(min(spl4,1),-1)*foo)/bar ,-1) ,1);
+spl5 = min(max( sin(max(min(spl5,1),-1)*foo)/bar ,-1) ,1);
+spl6 = min(max( sin(max(min(spl6,1),-1)*foo)/bar ,-1) ,1);
+spl7 = min(max( sin(max(min(spl7,1),-1)*foo)/bar ,-1) ,1);
+spl8 = min(max( sin(max(min(spl8,1),-1)*foo)/bar ,-1) ,1);
+spl9 = min(max( sin(max(min(spl9,1),-1)*foo)/bar ,-1) ,1);
+spl10 = min(max( sin(max(min(spl10,1),-1)*foo)/bar ,-1) ,1);
+spl11 = min(max( sin(max(min(spl11,1),-1)*foo)/bar ,-1) ,1);
+spl12 = min(max( sin(max(min(spl12,1),-1)*foo)/bar ,-1) ,1);
+spl13 = min(max( sin(max(min(spl13,1),-1)*foo)/bar ,-1) ,1);
+spl14 = min(max( sin(max(min(spl14,1),-1)*foo)/bar ,-1) ,1);
+spl15 = min(max( sin(max(min(spl15,1),-1)*foo)/bar ,-1) ,1);
+);
+
+//De-emphasis
+slider6 != 0 ? (
+ spl0 = de1.eq_do(spl0);
+ spl1 = de2.eq_do(spl1);
+ spl2 = de3.eq_do(spl2);
+ spl3 = de4.eq_do(spl3);
+ spl4 = de5.eq_do(spl4);
+ spl5 = de6.eq_do(spl5);
+ spl6 = de7.eq_do(spl6);
+ spl7 = de8.eq_do(spl7);
+ spl8 = de9.eq_do(spl8);
+ spl9 = de10.eq_do(spl9);
+ spl10 = de11.eq_do(spl10);
+ spl11 = de12.eq_do(spl11);
+ spl12 = de13.eq_do(spl12);
+ spl13 = de14.eq_do(spl13);
+ spl14 = de15.eq_do(spl14);
+ spl15 = de16.eq_do(spl15);
+);
+
+//Soft clipper
+spl0=tanh(spl0*gain)*invGain;
+spl1=tanh(spl1*gain)*invGain;
+spl2=tanh(spl2*gain)*invGain;
+spl3=tanh(spl3*gain)*invGain;
+spl4=tanh(spl4*gain)*invGain;
+spl5=tanh(spl5*gain)*invGain;
+spl6=tanh(spl6*gain)*invGain;
+spl7=tanh(spl7*gain)*invGain;
+spl8=tanh(spl8*gain)*invGain;
+spl9=tanh(spl9*gain)*invGain;
+spl10=tanh(spl10*gain)*invGain;
+spl11=tanh(spl11*gain)*invGain;
+spl12=tanh(spl12*gain)*invGain;
+spl13=tanh(spl13*gain)*invGain;
+spl14=tanh(spl14*gain)*invGain;
+spl15=tanh(spl15*gain)*invGain;
+
+
+// Hard limit in case input goes over 0dBFS:
+spl0=max(min(spl0,1),-1);
+spl1=max(min(spl1,1),-1);
+spl2=max(min(spl2,1),-1);
+spl3=max(min(spl3,1),-1);
+spl4=max(min(spl4,1),-1);
+spl5=max(min(spl5,1),-1);
+spl6=max(min(spl6,1),-1);
+spl7=max(min(spl7,1),-1);
+spl8=max(min(spl8,1),-1);
+spl9=max(min(spl9,1),-1);
+spl10=max(min(spl10,1),-1);
+spl11=max(min(spl11,1),-1);
+spl12=max(min(spl12,1),-1);
+spl13=max(min(spl13,1),-1);
+spl14=max(min(spl14,1),-1);
+spl15=max(min(spl15,1),-1);
+
+// Bring down to ceiling volume:
+spl0*=ceiling;
+spl1*=ceiling;
+spl2*=ceiling;
+spl3*=ceiling;
+spl4*=ceiling;
+spl5*=ceiling;
+spl6*=ceiling;
+spl7*=ceiling;
+spl8*=ceiling;
+spl9*=ceiling;
+spl10*=ceiling;
+spl11*=ceiling;
+spl12*=ceiling;
+spl13*=ceiling;
+spl14*=ceiling;
+spl15*=ceiling;
+
+
+//Mixing level
+spl0 =  (spl0 * levelA)  + 
+    (spl2 * levelB) + 
+    (spl4 * levelC) + 
+    (spl6 * levelD) + 
+    (spl8 * levelE) + 
+    (spl10 * levelF)+ 
+    (spl12 * levelG)+ 
+    (spl14 * levelH);
+
+// Do the right mix
+spl1 =   (spl1 * levelA)  + 
+    (spl3 * levelB) + 
+    (spl5 * levelC) + 
+    (spl7 * levelD) + 
+    (spl9 * levelE) + 
+    (spl11 * levelF)+ 
+    (spl13 * levelG)+ 
+    (spl15 * levelH);
+
+spl2=spl3=spl4=spl5=spl6=spl7=spl8=spl9=spl10=spl11=spl12=spl13=spl14=spl15=0;
+
+//Master level
+spl0 = (spl0 * L_Mlevel);
+spl1 = (spl1 * R_Mlevel);
+
+//Crosstalk
+slider35 != 0 ? (
+sum = (spl0+spl1)*0.5;
+diff = (spl0-spl1)*0.5;
+spl0 = sum+(diff*crosstalk);
+spl1 = sum-(diff*crosstalk);
+);
+
+//Output-amp soft clipping
+spl0=tanh(spl0*o_gain)*o_invGain;
+spl1=tanh(spl1*o_gain)*o_invGain;
+spl0=max(min(spl0,1),-1);
+spl1=max(min(spl1,1),-1);
+spl0*=o_ceiling;
+spl1*=o_ceiling;
+
+//Output saturation
+slider6 != 0 ? (
+ spl0 = peL.eq_do(spl0);
+ spl1 = peR.eq_do(spl1);
+ );
+ 
+slider48 ? (
+spl0 = min(max( sin(max(min(spl0,1),-1)*foo2)/bar2 ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo2)/bar2 ,-1) ,1);
+);
+
+slider6 != 0 ? (
+ spl0 = deL.eq_do(spl0);
+ spl1 = deR.eq_do(spl1);
+ );
+
+//Lowpass
+spl0 = Llp.butlp_do(spl0);
+spl1 = Rlp.butlp_do(spl1);
+
+//Output level
+spl0 = (spl0 * L_level);
+spl1 = (spl1 * R_level);
+
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;

@@ -1,0 +1,294 @@
+desc:Stombuss 3 modular 2ch summing mixer output stage
+//tags: summing mixer saturation clipping authentic analog vintage magic expensive
+//author: Akeda
+
+import cookdsp.jsfx-inc
+import sault-4xlimiter/st-oversampler.jsfx-inc
+//import Tale/oversampler.jsfx-inc
+
+slider2:1<0,1,1{off,on}>Oversampling
+slider5:20000<12000,21000,1>Pre 24dB/oct Lowpass freq(Hz)
+slider6:-24<-60,18,0.5>Pre/de-emphasis curve(dB, neg or pos)
+slider7:2500<1000,7000,1>Pre/de-emphasis center frequency (Hz)
+slider8:1<1,1.7,0.01>Pre/de-emphasis center mismatch (bass boost) (Hz)
+
+slider30:0<-60,20,0.1>Output stage MASTER gain/pad (dB)
+slider35:0<0,24,0.1>Output stage crosstalk/bleed (dB)
+
+slider45:3<0,32,0.1>Output-amp drive (dB)
+slider46:-3<-6,0,0.1>Output-amp Soft clipping ceiling (dB)
+
+slider48:80<0,100,1>Output (2ch)saturation (%)
+slider49:12000<1000,22000>Post 12dB/oct Lowpass freq(Hz)
+slider50:0<-12,6,0.1>Output trim(2ch) gain/pad (dB)
+
+slider63:1<0,1,1{off,on}>Brickwall on/off
+slider64:-0.7<-12,0,0.1>Hard clip/brickwall limiter (dB)
+
+in_pin:left input
+in_pin:right input
+
+out_pin:left output
+out_pin:right output
+
+@init
+bpos=0;
+gainMin = -60;
+gainMax = 30;
+itm1=itm2=otm1=otm2=0;
+
+//Low-pass
+LPlp.moog(slider5,0);
+RPlp.moog(slider5,0);
+Llp.butlp(slider49);
+Rlp.butlp(slider49);
+
+//Pre-emphasis
+peL.eq(slider7,0.1,slider6,0);
+peR.eq(slider7,0.1,slider6,0);
+
+//De-emphasis
+deL.eq((slider7*slider8),0.1,-slider6,0);
+deR.eq((slider7*slider8),0.1,-slider6,0);
+
+//High-pass
+Lhp.buthp(50);
+Rhp.buthp(50);
+
+//Soft clipper
+nominal = 0.5;
+function tanh(x) (exp(x)-exp(-x)) / (exp(x)+exp(-x));
+
+/*
+function colour(x)
+(
+  os2.os_up2(x);
+  //Output-amp soft clipping
+  os2.y1=tanh(os2.y1*o_gain)*o_invGain;
+  os2.y0=tanh(os2.y0*o_gain)*o_invGain;
+  os2.y1=max(min(os2.y1,1),-1);
+  os2.y0=max(min(os2.y0,1),-1);
+  os2.y1*=o_ceiling;
+  os2.y0*=o_ceiling;
+  os2.y1 = min(max( sin(max(min(os2.y1,1),-1)*foo2)/bar2 ,-1) ,1);
+  os2.y0 = min(max( sin(max(min(os2.y0,1),-1)*foo2)/bar2 ,-1) ,1);
+  os2.os_down2();
+);
+*/
+
+function saturate(x)
+(
+  x = min(max( sin(max(min(x,1),-1)*foo2)/bar2 ,-1) ,1);
+);
+function clipper(in)
+(
+    in = tanh(in*gain)*invGain;
+    in = max(min(in,1),-1);
+    in *= ceiling;
+);
+function clip2(in gain invGain ceiling)
+(
+    in = tanh(in*gain)*invGain;
+    in = max(min(in,1),-1);
+    in *= ceiling;
+);
+
+@slider
+something=slider1*srate;
+
+brickwall = 2 ^ (slider64/6);
+
+//Pre-emphasis
+peL.eq_set_freq(slider7*slider8);
+peR.eq_set_freq(slider7*slider8);
+
+peL.eq_set_boost(slider6);
+peR.eq_set_boost(slider6);
+
+//De-emphasis
+deL.eq_set_freq(slider7);
+deR.eq_set_freq(slider7);
+
+deL.eq_set_boost(-slider6);
+deR.eq_set_boost(-slider6);
+
+
+//Output-amp Soft clipper
+gain = 2^(slider45/6) * nominal;
+ceiling = 10^(slider46/20);
+// Scalar to get output of tanh(x) to -1..1 bounds regardless of the gain:
+invGain = 1/(tanh(gain));
+
+slider30 = min(max(slider30, gainMin), gainMax);
+L_Mlevel = 2 ^ (slider30 / 6);
+R_Mlevel = 2 ^ (slider30 / 6);
+
+//Crosstalk
+crosstalk = 2 ^ (-slider35 / 6);
+
+slider50 = min(max(slider50, gainMin), gainMax);
+L_level = 2 ^ (slider50 / 6);
+R_level = 2 ^ (slider50 / 6);
+
+//Saturation
+//Output
+foo2 = slider48/200*$pi;
+bar2 = sin(slider48/200*$pi);
+
+//Lowpass
+//Pre
+LPlp.moog_set_freq(slider5);
+RPlp.moog_set_freq(slider5);
+//Post
+Llp.butlp_set_freq(slider49);
+Rlp.butlp_set_freq(slider49);
+
+@block
+blah+=samplesblock;
+
+@sample
+
+//Pre Lowpass
+slider5 !== 21000 ? (
+  spl0 = LPlp.moog_do(spl0);
+  spl1 = RPlp.moog_do(spl1);
+);
+
+//Master level
+spl0 = (spl0 * L_Mlevel);
+spl1 = (spl1 * R_Mlevel);
+
+slider6 != 0 ? (
+ spl0 = peL.eq_do(spl0);
+ spl1 = peR.eq_do(spl1);
+);
+
+//Crosstalk
+slider35 != 0 ? (
+  sum = (spl0+spl1)*0.5;
+  diff = (spl0-spl1)*0.5;
+  spl0 = sum+(diff*crosstalk);
+  spl1 = sum-(diff*crosstalk);
+);
+
+/*
+slider45 != 0 ? (
+  g=0;
+  loop(2,
+    os2.os_up2(x);
+    spl(g)=colour(spl(g));
+    //spl1=colour(spl1);
+    g+=1;
+    );
+);
+*/
+
+//2x Oversampling os not?
+slider2 == 1 ? (
+    osL.os_up2(spl0);
+    osR.os_up2(spl1);
+  slider45 != 0 ? (
+      /*osL.y1 = clipper(osL.y1);
+      osL.y0 = clipper(osL.y0);
+      osR.y1 = clipper(osR.y1);
+      osR.y0 = clipper(osR.y0);*/
+      osL.y1 = clip2(osL.y1, gain, invGain, ceiling);
+      osL.y0 = clip2(osL.y0, gain, invGain, ceiling);
+      osR.y1 = clip2(osR.y1, gain, invGain, ceiling);
+      osR.y0 = clip2(osR.y0, gain, invGain, ceiling);
+      );
+  slider48 != 0 ? (
+  //spl0=osL.y1;
+  //spl1=osR.y1;
+    osL.y1 = saturate(osL.y1);
+    osL.y0 = saturate(osL.y0);
+    osR.y1 = saturate(osR.y1);
+    osR.y0 = saturate(osR.y0);
+    
+  //spl0=colour(spl0);
+  //spl1=colour(spl1);
+  //osL.y1=spl0;
+  //osR.y1=spl1;
+  );
+  spl0 = osL.os_down2();
+  spl1 = osR.os_down2();
+) : (
+  slider45 != 0 ? (
+    spl0 = clipper(spl0);
+    spl1 = clipper(spl1);
+  );
+  slider48 != 0 ? (
+    spl0 = saturate(spl0);
+    spl1 = saturate(spl1);
+  );
+/*    spl0=tanh(spl0*o_gain)*o_invGain;
+    spl1=tanh(spl1*o_gain)*o_invGain;
+    spl0=max(min(spl0,1),-1);
+    spl1=max(min(spl1,1),-1);
+    spl0*=o_ceiling;
+    spl1*=o_ceiling;
+  );
+  */
+);
+/*
+//Output-amp soft clipping
+slider45 != 0 ? (
+spl0=tanh(spl0*o_gain)*o_invGain;
+spl1=tanh(spl1*o_gain)*o_invGain;
+spl0=max(min(spl0,1),-1);
+spl1=max(min(spl1,1),-1);
+spl0*=o_ceiling;
+spl1*=o_ceiling;
+);
+
+//Output saturation
+slider6 != 0 ? (
+  spl0 = peL.eq_do(spl0);
+  spl1 = peR.eq_do(spl1);
+  );
+ 
+slider48 ? (
+  spl0 = min(max( sin(max(min(spl0,1),-1)*foo2)/bar2 ,-1) ,1);
+  spl1 = min(max( sin(max(min(spl1,1),-1)*foo2)/bar2 ,-1) ,1);
+  );
+*/
+
+slider6 != 0 ? (
+  spl0 = deL.eq_do(spl0);
+  spl1 = deR.eq_do(spl1);
+);
+
+//Lowpass
+slider49 != 20000 ? (
+  spl0 = Llp.butlp_do(spl0);
+  spl1 = Rlp.butlp_do(spl1);
+);
+
+//Output level
+spl0 = (spl0 * L_level);
+spl1 = (spl1 * R_level);
+
+//Hard limiter
+slider63 != 0 ? (
+  spl0 = min(max(spl0,-brickwall),brickwall);
+  spl1 = min(max(spl1,-brickwall),brickwall);
+);
+
+//Post limiter high-pass
+//slider63 != 0 ? (
+Lhp.buthp_do(spl0);
+Rhp.buthp_do(spl1);
+//);
+
+/*
+//Downsample
+slider2 == 1 ? (
+osL.y1 = spl0;
+osR.y1 = spl1;
+spl0=osL.os_down2();
+spl1=osR.os_down2();
+);
+*/
+//dc_block
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;

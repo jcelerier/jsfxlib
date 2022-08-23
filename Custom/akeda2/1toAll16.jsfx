@@ -1,0 +1,11 @@
+desc:Copy ch1 to all 16ch
+
+@init
+bpos=0;
+
+@slider
+
+@block
+
+@sample
+spl1=spl2=spl3=spl4=spl5=spl6=spl7=spl8=spl9=spl10=spl11=spl12=spl13=spl14=spl15=spl0;

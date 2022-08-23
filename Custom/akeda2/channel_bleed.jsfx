@@ -1,0 +1,33 @@
+desc:Channel bleed with saturation
+
+slider10:80<0,100,1>Bleed saturation (%)
+slider35:0<0,96,1>Bleed level >-96dB
+
+@init
+function saturate(x)
+(
+  x = min(max( sin(max(min(x,1),-1)*foo)/bar ,-1) ,1);
+);
+
+@slider
+foo = slider10/200*$pi;
+bar = sin(slider10/200*$pi);
+
+@block
+
+@sample
+//Bleed level and bleed saturation (same as global)
+slider35 != 0 ? (
+  bleed=0;
+  b=0;
+  loop(num_ch, slider10 != 0 ? (bleed+=(saturate(spl(b))*0.00001)
+                                    ) : (bleed+=(spl(b))*0.00001);
+      b+=1;
+      );
+  slider10 != 0 ? (bleed=saturate(bleed););
+  f=0;
+  loop(num_ch,
+    spl(f)+=bleed*(2^(slider35/6));
+    f+=1;
+  );
+);

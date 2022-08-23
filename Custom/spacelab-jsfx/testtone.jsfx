@@ -1,0 +1,34 @@
+// Copyright (C) 2008  Chris Rossi
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+desc: spacelab test tone generator
+
+slider1:1000<20,20000>frequency (hz)
+slider2:-12<-60,0>amplitude (db)
+
+@init
+step=1/srate;
+t=0;
+
+@slider
+two_pi_freq = 2 * $pi * slider1;
+gain = 10^(slider2/20);
+
+@block
+t > 10000 ? t -= 10000;
+
+@sample
+spl0 = spl1 = sin( two_pi_freq * t ) * gain;
+t += step;

@@ -1,0 +1,9 @@
+desc: MS midside sum/diff decoder
+//tags: ms sum/difference decoder
+//author: akeda
+
+@sample
+m = spl0;
+s = spl1;
+spl0 = m+s;
+spl1 = m-s;

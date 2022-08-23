@@ -1,0 +1,9 @@
+desc: MS midside sum/diff encoder
+//tags: ms sum/difference encoder
+//author: akeda
+
+@sample
+L = spl0;
+R = spl1;
+spl0 = (L+R) * 0.5;
+spl1 = (L-R) * 0.5;

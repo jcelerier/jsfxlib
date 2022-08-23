@@ -1,0 +1,36 @@
+desc:Really simple 8 second delay without dry signal passthrough
+//tags: delay wet
+//author: akeda
+
+import cookdsp.jsfx-inc
+
+slider5:1<0,1,1{off,on}>Delay on/off
+slider10:4000<1,8000,1>Delay time(ms)
+
+@init
+RLdelay.delay(10*srate);
+RRdelay.delay(10*srate);
+
+@slider
+//samps = slider10 * 0.001 * srate;
+samps = slider10 * 0.001 * srate;
+
+@block
+blah+=samplesblock;
+
+@sample
+spl0orig=spl0;
+spl1orig=spl1;
+
+slider5 != 0 ? (
+  RLdelay.delay_write(spl0orig);
+  RRdelay.delay_write(spl1orig);
+  RL = RLdelay.delay_read3(samps);
+  RR = RRdelay.delay_read3(samps);
+) : (
+  RL=spl0;
+  RR=spl1;
+);
+
+spl0=RL;
+spl1=RR;

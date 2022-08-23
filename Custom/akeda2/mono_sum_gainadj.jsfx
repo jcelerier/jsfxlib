@@ -1,0 +1,8 @@
+desc:Mono - sum with negative gain
+//tags: mono downmix sum gain
+//author: akeda
+
+@sample
+tmp0=(spl0+spl1)/2;
+
+spl0=spl1=tmp0;

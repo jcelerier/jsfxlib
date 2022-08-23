@@ -1,0 +1,55 @@
+desc:Kassettotronmixer
+
+slider1:-90<-90,0,0.1>vox1  1/2
+slider2:-90<-90,0,0.1>vox2  3/4
+slider3:-90<-90,0,0.1>vox3  5/6
+slider4:-90<-90,0,0.1>granA 7/8
+slider5:-90<-90,0,0.1>granB 9/10
+slider6:-90<-90,0,0.1>Pitchbuss 11/12
+slider7:-90<-90,0,0.1>Granulatorbuss 13/14
+slider8:-90<-90,0,0.1>15/16
+
+@init
+//bpos=0;
+gain1=gain2=gain3=gain4=gain5=gain6=gain7=0;
+
+@slider
+//something=slider1*srate;
+gain1 = 10^(slider1/20);
+gain2 = 10^(slider2/20);
+gain3 = 10^(slider3/20);
+gain4 = 10^(slider4/20);
+gain5 = 10^(slider5/20);
+gain6 = 10^(slider6/20);
+gain7 = 10^(slider7/20);
+gain8 = 10^(slider8/20);
+
+@block
+//blah+=samplesblock;
+
+@sample
+spl0= (
+(spl0*gain1)+
+(spl2*gain2)+
+(spl4*gain3)+
+(spl6*gain4)+
+(spl8*gain5)+
+(spl10*gain6)+
+(spl12*gain7)+
+(spl14*gain8)
+//(spl16*gain6)
+);
+
+
+spl1= (
+(spl1*gain1)+
+(spl3*gain2)+
+(spl5*gain3)+
+(spl7*gain4)+
+(spl9*gain5)+
+(spl11*gain6)+
+(spl13*gain7)+
+(spl15*gain8)
+);
+
+spl2=spl3=spl4=spl5=spl6=spl7=spl8=spl9=spl10=spl11=spl12=spl13=spl14=spl15=0;

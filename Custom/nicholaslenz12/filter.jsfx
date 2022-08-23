@@ -1,0 +1,58 @@
+/*
+ Nicholas Lenz
+ Github : nicholaslenz12@gmail.com
+
+ Basic 1-pole low-pass filter.
+
+ Needs work:
+ - Scale on the slider is near-unusable.
+ - GUI would be nice.
+ - Comments!
+ */
+desc:Filter
+
+// ----------------------------------------------------------------------------
+// SLIDER DEFINITIONS
+// ----------------------------------------------------------------------------
+slider1:1<1,2,.0001>Cutoff
+
+// ----------------------------------------------------------------------------
+// DEFAULT CHANNEL CONFIGURATION
+// ----------------------------------------------------------------------------
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+// ----------------------------------------------------------------------------
+// INIT
+// ----------------------------------------------------------------------------
+@init
+xL1=xR1=yL1=yR1;
+
+// ----------------------------------------------------------------------------
+// SLIDER
+// ----------------------------------------------------------------------------
+@slider
+cutoff = log(slider1);
+a = cutoff;
+b = 1-a;
+
+// ----------------------------------------------------------------------------
+// SAMPLE
+// ----------------------------------------------------------------------------
+@sample
+inputL = spl0;
+inputR = spl1;
+
+outputL = a*inputL + b*yL1;
+outputR = a*inputR + b*yR1;
+
+xL1 = inputL;
+xR1 = inputR;
+
+yL1 = outputL;
+yR1 = outputR;
+
+spl0 = outputL;
+spl1 = outputR;

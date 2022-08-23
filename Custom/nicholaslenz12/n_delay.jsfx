@@ -1,0 +1,146 @@
+ /*
+ Nicholas Lenz
+ Github : nicholaslenz12@gmail.com
+
+ Single tap delay. Can also modulate the delay between the left and right channel
+ (Ping-Pong). Can be synced to project tempo.
+
+ Needs help:
+ - Needs sample-accurate automation for delay length changes
+ > Make GUI like:
+   |     |     |         |     |     |
+   | | : | | : | | : ->  | : | | : | | :
+   -----------------    -----------------
+ */
+desc:N-Delay
+
+// ----------------------------------------------------------------------------
+// SLIDER DEFINITIONS
+// ----------------------------------------------------------------------------
+slider1:200<1,2000,1>Length (ms)
+slider2:50<0,100,1>Feedback
+slider3:50<0,100,1>Mix
+slider4:100<-100,100,1>Width
+slider5:.5<.125,1,.125>Fraction of Quarter Note
+slider6:1<0,1,{Off,On}>Tempo Sync
+
+// ----------------------------------------------------------------------------
+// DEFAULT CHANNEL CONFIGURATION
+// ----------------------------------------------------------------------------
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+// ----------------------------------------------------------------------------
+// INIT
+// ----------------------------------------------------------------------------
+@init
+init = 1;
+cycle_index = 0;
+
+source_feedback = target_feedback = slider2/100;
+source_mix      = target_mix      = slider3/100;
+source_width    = target_width    = (slider4+100)/200;
+
+length = 0;
+rate = 0;
+
+delta = 1;
+
+function bound(value, lower, upper)
+(
+  max(min(value, upper), lower);
+);
+
+// ----------------------------------------------------------------------------
+// SLIDER
+// ----------------------------------------------------------------------------
+@slider
+target_feedback = slider2/100;
+target_mix      = slider3/100;
+target_width    = (slider4+100)/200;
+
+(slider1 != length) || (slider5 != rate) || (slider6 != tempo_sync) ? delta = 1;
+
+length     = slider1;
+rate       = slider5;
+tempo_sync = slider6;
+
+pp = 0;
+l_pp_gain = 0;
+r_pp_gain = 0;
+
+// ----------------------------------------------------------------------------
+// BLOCK
+// ----------------------------------------------------------------------------
+@block
+// set delay length in samples.
+
+delta ?
+(
+    tempo_sync ?
+    (
+        delay_samples = rate*srate*60/tempo;
+    ) :
+    (
+        delay_samples = length*srate/1000;
+    );
+    delta = 0;
+);
+
+delta_mix      = (target_mix - source_mix)/samplesblock;
+delta_feedback = (target_feedback - source_feedback)/samplesblock;
+delta_width    = (target_width - source_width)/samplesblock;
+
+current_mix      = source_mix;
+current_feedback = source_feedback;
+current_width    = source_width;
+
+source_mix      = target_mix;
+source_feedback = target_feedback;
+source_width    = target_width;
+
+// ----------------------------------------------------------------------------
+// SAMPLE
+// ----------------------------------------------------------------------------
+@sample
+current_mix         += delta_mix;
+reverse_mix          = 1 - current_mix;
+current_feedback    += delta_feedback;
+current_width       += delta_width;
+
+// Draw from memory
+delay_buffer = 2*cycle_index;
+effect_left  = delay_buffer[0];
+effect_right = delay_buffer[1];
+delay_buffer[0] = spl0 + effect_left*current_feedback;
+delay_buffer[1] = spl1 + effect_right*current_feedback;
+
+current_reverse_width = 1 - current_width;
+
+pp == 0 ?
+(
+    spl0 = spl0*reverse_mix + r_pp_gain*effect_left*current_mix*current_reverse_width;
+    spl1 = spl1*reverse_mix + r_pp_gain*effect_right*current_mix*current_width;
+    r_pp_gain = min(1, r_pp_gain + max(1/100, 1/delay_samples));
+    l_pp_gain = 1 - r_pp_gain;
+) :
+(
+    spl0 = spl0*reverse_mix + l_pp_gain*effect_left*current_mix*current_width;
+    spl1 = spl1*reverse_mix + l_pp_gain*effect_right*current_mix*current_reverse_width;
+    r_pp_gain = max(0, r_pp_gain - max(1/100, 1/delay_samples));
+    l_pp_gain = 1 - r_pp_gain;
+);
+
+(cycle_index += 1) > delay_samples ? // If last sample for current echo reached
+(
+    cycle_index = 0; // Reset sample position of delay
+    pp = 1 - pp; // Switch primary channel for Ping-Pong
+);
+
+
+// ----------------------------------------------------------------------------
+// GRAPHICS
+// ----------------------------------------------------------------------------
+// ...

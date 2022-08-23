@@ -1,0 +1,98 @@
+desc:Stombuss 2b 6 stereo-ch broadcast mixer with cascaded crossfading
+
+
+//Vox/microphones 1,2 (spl0,spl11)
+slider1:0<-12,6,0.1>vox_1 1/2
+slider2:0<-12,6,0.1>vox_2 3/4
+slider3:0<-12,6,0.1>vox_3 5/6
+
+//Internal 3,4 (spl2,spl3)
+slider4:0<-12,6,0.1>Source_A 7/8
+slider5:0<-12,6,0.1>B 9/10
+slider6:0<-12,6,0.1>C 11/12
+//slider7:0<-12,6,0.1>Source_D 13/14
+//slider8:0<-12,6,0.1>Source_E 15/16
+
+
+slider20:0<-40,40,0.1>A <-|-> B
+slider25:0<-40,40,0.1>AB <-|-> C
+slider30:0<-40,40,0.1>ABC <-|-> Vox
+//slider50:0<-40,40,0.1>Vox_123 <-|-> ABC
+slider63:0<-40,6,0.1>Gain/pad
+
+@init
+//bpos=0;
+@init
+//gainMax = 10;
+//gainMin = -90;
+//sliderPos = 0;
+gainpad = 0;
+gain1=gain2=gain3=gain4=gain5=gain6=gain7=gain8=0;
+
+@slider
+gain1 = 10^(slider1/20);
+gain2 = 10^(slider2/20);
+gain3 = 10^(slider3/20);
+gain4 = 10^(slider4/20);
+gain5 = 10^(slider5/20);
+gain6 = 10^(slider6/20);
+//gain7 = 10^(slider7/20);
+//gain8 = 10^(slider8/20);
+
+//Crossfade section:
+slider20 < -40 ? slider20 = -40;
+slider20 > 40 ? slider20 = 40;
+
+slider25 < -40 ? slider25 = -40;
+slider25 > 40 ? slider25 = 40;
+
+slider30 < -40 ? slider30 = -40;
+slider30 > 40 ? slider30 = 40;
+
+mixAB = slider20;
+mixAB == 40 ? mixAB = 100;
+mixAB == -40 ? mixAB = -100;
+
+mixABC = slider25;
+mixABC == 40 ? mixABC = 100;
+mixABC == -40 ? mixABC = -100;
+
+mixABCV = slider30;
+mixABCV == 40 ? mixABCV = 100;
+mixABCV == -40 ? mixABCV = -100;
+
+slider20 <= 0 ? ( crAB_T1 = 1; crAB_T2 = 2 ^ ( mixAB/ 6 );) : ( crAB_T1 = 2 ^ ( -mixAB / 6 ); crAB_T2 = 1;);
+slider25 <= 0 ? ( crABC_T1 = 1; crABC_T2 = 2 ^ ( mixABC/ 6 );) : ( crABC_T1 = 2 ^ ( -mixABC / 6 ); crABC_T2 = 1;);
+slider30 <= 0 ? ( crABCV_T1 = 1; crABCV_T2 = 2 ^ ( mixABCV/ 6 );) : ( crABCV_T1 = 2 ^ ( -mixABCV / 6 ); crABCV_T2 = 1;);
+
+//Gainpad
+gainpad =  10^(slider10/20);
+
+@block
+
+@sample
+voxL = ((spl0*gain1)+(spl2*gain2)+(spl4*gain3));
+voxR = ((spl1*gain1)+(spl3*gain2)+(spl5*gain3));
+
+AL = spl6*gain4; AR = spl7*gain4; BL = spl8*gain5; BR = spl9*gain5; CL = spl10*gain6; CR = spl11*gain6;
+
+//spl2=spl3=
+spl4=spl5=spl6=spl7=spl8=spl9=spl10=spl11=spl12=spl13=spl14=spl15=0;
+
+
+//AB
+ABL = ((AL * crAB_T1) + (BL * crAB_T2));
+ABR = ((AR * crAB_T1) + (BR * crAB_T2));
+//ABC
+ABCL = ((ABL * crABC_T1) + (CL * crABC_T2));
+ABCR = ((ABR * crABC_T1) + (CR * crABC_T2));
+//ABCV
+ABCVL = ((ABCL * crABCV_T1) + (voxL * crABCV_T2));
+ABCVR = ((ABCR * crABCV_T1) + (voxR * crABCV_T2));
+
+//Final gainpad
+spl0 = ABCVL*gainpad;
+spl1 = ABCVR*gainpad;
+
+
+

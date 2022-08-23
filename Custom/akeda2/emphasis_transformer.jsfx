@@ -1,0 +1,64 @@
+desc:Transformer-like saturation with pre/de-emphasis and bandwidth limiting
+
+import cookdsp.jsfx-inc
+
+slider1:0<0,100,1>Amount (%)
+slider6:-24<-60,18,0.5>Pre-emphasis curve(dB, neg or pos)
+slider7:2500<1000,7000,1>Pre-emphasis filter frequency (Hz)
+slider8:1<1,1.7,0.01>Pre/de-emphasis center mismatch (bass boost) (Hz)
+
+@init
+gfx_clear = 0;
+
+//dc_remove
+itm1=itm2=otm1=otm2=0;
+
+//Pre-emphasis
+LS.eq(slider7,0.1,slider6,0);
+RS.eq(slider7,0.1,slider6,0);
+//De-emphasis
+Lde.eq((slider7*-slider8),(0.1),(-slider6),0);
+Rde.eq((slider7*-slider8),(0.1),(-slider6),0);
+
+@slider
+foo=slider1/200*$pi;
+bar = sin(slider1/200*$pi);
+
+//Pre-emphasis
+LS.eq_set_freq(slider7);
+RS.eq_set_freq(slider7);
+LS.eq_set_boost(slider6);
+RS.eq_set_boost(slider6);
+//De-emphasis
+Lde.eq_set_freq(slider7/slider8);
+Rde.eq_set_freq(slider7/slider8);
+Lde.eq_set_boost(-slider6);
+Rde.eq_set_boost(-slider6);
+Lde.eq_set_q(0.1);
+Rde.eq_set_q(0.1);
+
+@sample
+
+//Pre-emphasis
+slider6 != 0 ? (
+ spl0 = LS.eq_do(spl0);
+ spl1 = RS.eq_do(spl1);
+);
+
+//Saturation
+slider1 ? (
+spl0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+);
+
+//De-emphasis
+slider6 != 0 ? (
+ spl0 = Lde.eq_do(spl0);
+ spl1 = Rde.eq_do(spl1);
+);
+
+//dc_remove
+//slider12 == 0 ? (
+ otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+ otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+// );

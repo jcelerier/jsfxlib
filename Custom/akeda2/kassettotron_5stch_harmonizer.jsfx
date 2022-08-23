@@ -1,0 +1,81 @@
+// (c) Funkhaus Lund, David Åkesson
+
+desc:Kassettotron vox-ch 5 stereo voices harmonizer
+
+import cookdsp.jsfx-inc
+
+slider1:0<-24,24,1> vox1
+slider2:0<-24,24,1> vox2
+slider3:0<-24,24,1> vox3
+slider4:0<-24,24,1> GranA
+slider5:0<-24,24,1> GranB
+
+slider6:0<-1,1>Feedback Level
+slider7:0.1<0.001,1>Window Size In Seconds
+
+@init
+h1.harmon(slider1, slider6, slider7);
+h2.harmon(slider1, slider6, slider7);
+h3.harmon(slider2, slider6, slider7);
+h4.harmon(slider2, slider6, slider7);
+h5.harmon(slider3, slider6, slider7);
+h6.harmon(slider3, slider6, slider7);
+h7.harmon(slider4, slider6, slider7);
+h8.harmon(slider4, slider6, slider7);
+h9.harmon(slider5, slider6, slider7);
+h10.harmon(slider5, slider6, slider7);
+
+@slider
+h1.harmon_set_transpo(slider1);
+h2.harmon_set_transpo(slider1);
+h1.harmon_set_feedback(slider6);
+h2.harmon_set_feedback(slider6);
+h1.harmon_set_winsize(slider7);
+h2.harmon_set_winsize(slider7);
+
+h3.harmon_set_transpo(slider2);
+h4.harmon_set_transpo(slider2);
+h3.harmon_set_feedback(slider6);
+h4.harmon_set_feedback(slider6);
+h3.harmon_set_winsize(slider7);
+h4.harmon_set_winsize(slider7);
+
+h5.harmon_set_transpo(slider3);
+h6.harmon_set_transpo(slider3);
+h5.harmon_set_feedback(slider6);
+h6.harmon_set_feedback(slider6);
+h5.harmon_set_winsize(slider7);
+h6.harmon_set_winsize(slider7);
+
+h7.harmon_set_transpo(slider4);
+h8.harmon_set_transpo(slider4);
+h7.harmon_set_feedback(slider6);
+h8.harmon_set_feedback(slider6);
+h7.harmon_set_winsize(slider7);
+h8.harmon_set_winsize(slider7);
+
+h9.harmon_set_transpo(slider5);
+h10.harmon_set_transpo(slider5);
+h9.harmon_set_feedback(slider6);
+h10.harmon_set_feedback(slider6);
+h9.harmon_set_winsize(slider7);
+h10.harmon_set_winsize(slider7);
+
+@sample
+spl0 = h1.harmon_do(spl0); 
+spl1 = h2.harmon_do(spl1); 
+
+spl2 = h3.harmon_do(spl2); 
+spl3 = h4.harmon_do(spl3); 
+
+spl4 = h5.harmon_do(spl4); 
+spl5 = h6.harmon_do(spl5); 
+
+spl6 = h7.harmon_do(spl6); 
+spl7 = h8.harmon_do(spl7); 
+
+spl8 = h9.harmon_do(spl8); 
+spl9 = h10.harmon_do(spl9); 
+
+//spl0 *= 0.5; spl1 *= 0.5;
+

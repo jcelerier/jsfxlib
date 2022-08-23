@@ -1,0 +1,48 @@
+// Copyright (C) 2008  Chris Rossi
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+desc: spacelab auto normalizer
+
+slider1:30<0,100>gain (db)
+slider2:-0.1<-10,0>limit (dbfs)
+
+@slider
+lastgain = gain = 10^(slider1/20);
+limit = 10^(slider2/20);
+
+@block
+lastgain != gain ? (
+    slider1 = 20 * log10(gain);
+    sliderchange(slider1);
+    lastgain = gain;
+);    
+
+@sample
+nextgain = -1;
+abs(spl0*gain) > limit ?
+    nextgain = limit / abs(spl0);
+
+abs(spl1*gain) > limit ?
+    nextgain = nextgain > 0 ? 
+                 min( nextgain, limit / abs(spl1) ) : 
+                 limit / abs(spl1);
+
+nextgain > 0 ?
+    // I'm not sure why this sudden, discontinuous change
+    // in gain doesn't cause nasty popping, but it doesn't.
+    gain = nextgain;
+
+spl0 *= gain;
+spl1 *= gain;

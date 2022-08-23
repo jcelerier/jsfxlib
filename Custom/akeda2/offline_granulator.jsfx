@@ -1,0 +1,36 @@
+// JSFX-CookDSP - grains - manual example
+// (c) Olivier Belanger - 2015 - belangeo@gmail.com
+
+desc:Simple Granulator
+
+slider1:1<1,24,1>Number Of Grains
+slider2:1<0.125,3.84>Speed
+slider3:0.5<0,1>Reading Position
+slider4:0.1<0.01,2>Grain Duration
+slider5:0.1<0,1>Random Transposition
+slider6:0.1<0,1>Random Position
+slider7:0<0,1,1{Playing,Recording}>Play/Record Mode
+slider8:0<-90,10,0.1>Output gain/pad
+
+import cookdsp.jsfx-inc
+
+@init
+// Initializes 2 granulators with an internal memory of 10 seconds.
+bufL = grL.grains(slider1, slider2, slider3, slider4, slider5, slider6, 10);
+bufR = grR.grains(slider1, slider2, slider3, slider4, slider5, slider6, 10);
+
+@slider
+// Sets all parameters at once.
+grL.grains_set(slider1, slider2, slider3, slider4, slider5, slider6);
+grR.grains_set(slider1, slider2, slider3, slider4, slider5, slider6);
+// We need to record some samples in memory to be able to granulate them.
+grL.grains_record(slider7);
+grR.grains_record(slider7);
+gainpad =  10^(slider8/20);
+
+@sample
+// Only output signal when in playing state.
+//play_state == 1 ? (
+    spl0 = grL.grains_do(spl0)*gainpad;
+    spl1 = grR.grains_do(spl1)*gainpad;
+//);

@@ -1,0 +1,60 @@
+desc:Inter-modulation test tones 18+19 and 21+22kHz
+
+import cookdsp.jsfx-inc
+
+slider1:-24<-96,0,1>Level (dB)
+slider2:1<0,1,1{off,on}>18+19kHz
+slider3:1<0,1,1{off,on}>21+22kHz
+slider4:0<0,1,1{stereo,multi}>Stereo or multichannel
+
+@init
+
+frm = 100;
+sine1.sine(frm*210, 0);
+sine2.sine(frm*220, 0);
+sine3.sine(frm*180, 0);
+sine4.sine(frm*190, 0);
+
+slider4 == 1 ? (
+    myChannels = num_ch;
+    ) : (
+    myChannels = 2;
+);
+
+@slider
+gain=2^(slider1 /6);
+
+slider4 == 1 ? (
+    myChannels = num_ch;
+    ) : (
+    myChannels = 2;
+);
+
+@sample
+slider3 == 1 ? (
+  output += (
+  sine1.sine_do()+
+  sine2.sine_do()
+  );
+);
+slider2 == 1 ? (
+  output += (
+  sine3.sine_do()+
+  sine4.sine_do()
+  );
+);
+output *= gain;//* 0.125);
+b=0;
+loop(myChannels,
+  spl(b)+=output;
+  b+=1;
+  );
+
+/*
+spl1 += ((
+sine1.sine_do()+
+sine2.sine_do()+
+sine3.sine_do()+
+sine4.sine_do()
+) * 0.125);
+*/

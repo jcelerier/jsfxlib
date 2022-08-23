@@ -1,0 +1,20 @@
+@description Scale files for IX effects
+@version     1.0
+@author      IX
+@about
+   Sample scale files used by MIDI_KeySnap and MIDI_Variant. For details of how to define scales see [wiki entry.](http://wiki.cockos.com/wiki/index.php/Jesusonic_Effects_Documentation#IX_Scale_Files)
+@provides
+  ix_scales/Chromatic.txt > ../../ix_scales/Chromatic.txt
+  ix_scales/Dorian.txt > ../../ix_scales/Dorian.txt
+  ix_scales/Harmonic Minor.txt > ../../ix_scales/Harmonic Minor.txt
+  ix_scales/Locrian.txt > ../../ix_scales/Locrian.txt
+  ix_scales/Lydian.txt > ../../ix_scales/Lydian.txt
+  ix_scales/Major.txt > ../../ix_scales/Major.txt
+  ix_scales/Melodic Minor.txt > ../../ix_scales/Melodic Minor.txt
+  ix_scales/Mixolydian.txt > ../../ix_scales/Mixolydian.txt
+  ix_scales/Natural Minor.txt > ../../ix_scales/Natural Minor.txt
+  ix_scales/Pentatonic Major.txt > ../../ix_scales/Pentatonic Major.txt
+  ix_scales/Pentatonic Minor.txt > ../../ix_scales/Pentatonic Minor.txt
+  ix_scales/Phrygian.txt > ../../ix_scales/Phrygian.txt
+  ix_scales/Whole Tone.txt > ../../ix_scales/Whole Tone.txt
+

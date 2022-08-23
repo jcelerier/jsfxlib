@@ -1,0 +1,114 @@
+/*******************************************************************************
+*  Copyright 2007 - 2016, David Åkesson                                        *
+*  This program is free software: you can redistribute it and/or modify        *
+*  it under the terms of the GNU General Public License as published by        *
+*  the Free Software Foundation, either version 3 of the License, or           *
+*  (at your option) any later version.                                         *
+*                                                                              *
+*  This program is distributed in the hope that it will be useful,             *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of              *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the                *
+*  GNU General Public License (http://www.gnu.org/licenses/)for more details.  *
+*******************************************************************************/
+
+desc:12ch to 12ch level trim
+//tags: 12 channel trim
+//author: akeda
+in_pin:1
+in_pin:2
+in_pin:3
+in_pin:4
+in_pin:5
+in_pin:6
+in_pin:7
+in_pin:8
+in_pin:9
+in_pin:10
+in_pin:11
+in_pin:12
+out_pin:1
+out_pin:2
+out_pin:3
+out_pin:4
+out_pin:5
+out_pin:6
+out_pin:7
+out_pin:8
+out_pin:9
+out_pin:10
+out_pin:11
+out_pin:12
+
+slider1:0<-120,30,0.1>Level 1 (dB)
+slider2:0<-120,30,0.1>Level 2 (dB)
+slider3:0<-120,30,0.1>Level 3 (dB)
+slider4:0<-120,30,0.1>Level 4 (dB)
+slider5:0<-120,30,0.1>Level 5 (dB)
+slider6:0<-120,30,0.1>Level 6 (dB)
+slider7:0<-120,30,0.1>Level 7 (dB)
+slider8:0<-120,30,0.1>Level 8 (dB)
+//slider9:0<-120,30,0.1>Level 9 (dB)
+//slider10:0<-120,30,0.1>Level 10 (dB)
+//slider11:0<-120,30,0.1>Level 11 (dB)
+//slider12:0<-120,30,0.1>Level 12 (dB)
+
+@init
+gainMin = -120;
+gainMax = 30;
+
+@slider
+
+slider1 = min(max(slider1, gainMin), gainMax);
+slider2 = min(max(slider2, gainMin), gainMax);
+slider3 = min(max(slider3, gainMin), gainMax);
+slider4 = min(max(slider4, gainMin), gainMax);
+slider5 = min(max(slider5, gainMin), gainMax);
+slider6 = min(max(slider6, gainMin), gainMax);
+slider7 = min(max(slider7, gainMin), gainMax);
+slider8 = min(max(slider8, gainMin), gainMax);
+//slider9 = min(max(slider9, gainMin), gainMax);
+//slider10 = min(max(slider10, gainMin), gainMax);
+//slider11 = min(max(slider11, gainMin), gainMax);
+//slider12 = min(max(slider12, gainMin), gainMax);
+
+gain1 = 2 ^ (slider1 / 6);
+gain2 = 2 ^ (slider2 / 6);
+gain3 = 2 ^ (slider3 / 6);
+gain4 = 2 ^ (slider4 / 6);
+gain5 = 2 ^ (slider5 / 6);
+gain6 = 2 ^ (slider6 / 6);
+gain7 = 2 ^ (slider7 / 6);
+gain8 = 2 ^ (slider8 / 6);
+//gain9 = 2 ^ (slider9 / 6);
+//gain10 = 2 ^ (slider10 / 6);
+//gain11 = 2 ^ (slider11 / 6);
+//gain12 = 2 ^ (slider12 / 6);
+
+@sample
+
+in1 = spl0; in2 = spl1; in3 = spl2; in4 = spl3;
+in5 = spl4; in6 = spl5; in7 = spl6; in8 = spl7;
+in9 = spl8; in10 = spl9; in11 = spl10; in12 = spl11;
+in13 = spl12; in14 = sp13; in15 = spl14; in16 = spl15;
+
+spl0 = (in1 * gain1);
+spl1 = (in2 * gain1);
+spl2 = (in3 * gain2);
+spl3 = (in4 * gain2);
+spl4 = (in5 * gain3);
+spl5 = (in6 * gain3);
+spl6 = (in7 * gain4);
+spl7 = (in8 * gain4);
+spl8 = (in9 * gain5);
+spl9 = (in10 * gain5);
+spl10 = (in11 * gain6);
+spl11 = (in12 * gain6);
+spl12 = (in13 * gain7);
+spl13 = (in14 * gain7);
+spl14 = (in15 * gain8);
+spl15 = (in16 * gain8);
+
+
+
+
+

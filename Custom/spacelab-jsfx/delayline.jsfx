@@ -1,0 +1,48 @@
+// Copyright (C) 2008  Chris Rossi
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+desc: spacelab delay line (good for reverb predelays, etc...)
+
+slider1:50<0,1000>time (ms)
+slider2:0<0,100000>samples
+
+@init
+samples = 0;
+time = 0;
+
+@slider
+time != slider1 ? (
+    time = slider1;
+    slider2 = samples = floor(time * 0.001 * srate);
+) : samples != slider2 ? time = samples / srate / 0.001;
+startover=1;
+lbuf = addr = 0;
+rbuf = samples;
+freembuf(samples*2);
+
+@sample
+l = spl0;
+r = spl1;
+
+! startover ? (
+    spl0 = lbuf[addr];
+    spl1 = rbuf[addr];
+);
+
+lbuf[addr] = l;
+rbuf[addr] = r;
+
+addr += 1;
+addr == samples ? addr = startover = 0;

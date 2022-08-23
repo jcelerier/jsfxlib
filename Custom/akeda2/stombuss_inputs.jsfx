@@ -1,0 +1,395 @@
+desc:Stombuss 1 modular 8/16ch preamp
+//tags: summing mixer saturation clipping authentic analog vintage magic expensive
+//author: Akeda
+
+import cookdsp.jsfx-inc
+
+slider6:-24<-60,18,0.5>Pre/de-emphasis curve(dB, neg or pos)
+slider7:2500<1000,7000,1>Pre/de-emphasis center frequency (Hz)
+slider8:1<1,1.7,0.01>Pre/de-emphasis center mismatch (bass boost) (Hz)
+
+slider10:80<0,100,1>Input(16ch) saturation (%)
+slider15:18<0,32,0.1>Global(16ch) input-amps drive (dB)
+slider16:-6<-12,0,0.1>Input-amps Soft clipping ceiling (dB)
+
+slider21:0<-60,6,0.1>Gain (dB) 1/2
+slider22:0<-60,6,0.1>3/4
+slider23:0<-60,6,0.1>5/6
+slider24:0<-60,6,0.1>7/8
+slider25:0<-60,6,0.1>9/10
+slider26:0<-60,6,0.1>11/12
+slider27:0<-60,6,0.1>13/14
+slider28:0<-60,6,0.1>15/16
+
+slider35:0<0,96,1>Channel bleed >-96dB
+
+
+in_pin:Input 1
+in_pin:Input 2
+in_pin:Input 3
+in_pin:Input 4
+in_pin:Input 5
+in_pin:Input 6
+in_pin:Input 7
+in_pin:Input 8
+in_pin:Input 9
+in_pin:Input 10
+in_pin:Input 11
+in_pin:Input 12
+in_pin:Input 13
+in_pin:Input 14
+in_pin:Input 15
+in_pin:Input 16
+
+out_pin:Output 1
+out_pin:Output 2
+out_pin:Output 3
+out_pin:Output 4
+out_pin:Output 5
+out_pin:Output 6
+out_pin:Output 7
+out_pin:Output 8
+out_pin:Output 9
+out_pin:Output 10
+out_pin:Output 11
+out_pin:Output 12
+out_pin:Output 13
+out_pin:Output 14
+out_pin:Output 15
+out_pin:Output 16
+
+
+@init
+bpos=0;
+gainMin = -60;
+gainMax = 30;
+itm1=itm2=otm1=otm2=0;
+
+//Pre-emphasis
+pe1.eq(slider7,0.1,slider6,0);
+pe2.eq(slider7,0.1,slider6,0);
+pe3.eq(slider7,0.1,slider6,0);
+pe4.eq(slider7,0.1,slider6,0);
+pe5.eq(slider7,0.1,slider6,0);
+pe6.eq(slider7,0.1,slider6,0);
+pe7.eq(slider7,0.1,slider6,0);
+pe8.eq(slider7,0.1,slider6,0);
+pe9.eq(slider7,0.1,slider6,0);
+pe10.eq(slider7,0.1,slider6,0);
+pe11.eq(slider7,0.1,slider6,0);
+pe12.eq(slider7,0.1,slider6,0);
+pe13.eq(slider7,0.1,slider6,0);
+pe14.eq(slider7,0.1,slider6,0);
+pe15.eq(slider7,0.1,slider6,0);
+pe16.eq(slider7,0.1,slider6,0);
+
+//De-emphasis
+de1.eq(slider7,0.1,-slider6,0);
+de2.eq(slider7,0.1,-slider6,0);
+de3.eq(slider7,0.1,-slider6,0);
+de4.eq(slider7,0.1,-slider6,0);
+de5.eq(slider7,0.1,-slider6,0);
+de6.eq(slider7,0.1,-slider6,0);
+de7.eq(slider7,0.1,-slider6,0);
+de8.eq(slider7,0.1,-slider6,0);
+de9.eq(slider7,0.1,-slider6,0);
+de10.eq(slider7,0.1,-slider6,0);
+de11.eq(slider7,0.1,-slider6,0);
+de12.eq(slider7,0.1,-slider6,0);
+de13.eq(slider7,0.1,-slider6,0);
+de14.eq(slider7,0.1,-slider6,0);
+de15.eq(slider7,0.1,-slider6,0);
+de16.eq(slider7,0.1,-slider6,0);
+
+//Soft clipper
+nominal = 0.5;
+function tanh(x) (exp(x)-exp(-x)) / (exp(x)+exp(-x));
+
+function saturate(x)
+(
+  x = min(max( sin(max(min(x,1),-1)*foo)/bar ,-1) ,1);
+);
+function clipper(in)
+(
+    in = tanh(in*gain)*invGain;
+    in = max(min(in,1),-1);
+    in *= ceiling;
+);
+
+@slider
+//Pre-emphasis
+pe1.eq_set_freq(slider7);
+pe2.eq_set_freq(slider7);
+pe3.eq_set_freq(slider7);
+pe4.eq_set_freq(slider7);
+pe5.eq_set_freq(slider7);
+pe6.eq_set_freq(slider7);
+pe7.eq_set_freq(slider7);
+pe8.eq_set_freq(slider7);
+pe9.eq_set_freq(slider7);
+pe10.eq_set_freq(slider7);
+pe11.eq_set_freq(slider7);
+pe12.eq_set_freq(slider7);
+pe13.eq_set_freq(slider7);
+pe14.eq_set_freq(slider7);
+pe15.eq_set_freq(slider7);
+pe16.eq_set_freq(slider7);
+
+pe1.eq_set_boost(slider6);
+pe2.eq_set_boost(slider6);
+pe3.eq_set_boost(slider6);
+pe4.eq_set_boost(slider6);
+pe5.eq_set_boost(slider6);
+pe6.eq_set_boost(slider6);
+pe7.eq_set_boost(slider6);
+pe8.eq_set_boost(slider6);
+pe9.eq_set_boost(slider6);
+pe10.eq_set_boost(slider6);
+pe11.eq_set_boost(slider6);
+pe12.eq_set_boost(slider6);
+pe13.eq_set_boost(slider6);
+pe14.eq_set_boost(slider6);
+pe15.eq_set_boost(slider6);
+pe16.eq_set_boost(slider6);
+
+//De-emphasis
+de1.eq_set_freq(slider7);
+de2.eq_set_freq(slider7);
+de3.eq_set_freq(slider7);
+de4.eq_set_freq(slider7);
+de5.eq_set_freq(slider7);
+de6.eq_set_freq(slider7);
+de7.eq_set_freq(slider7);
+de8.eq_set_freq(slider7);
+de9.eq_set_freq(slider7);
+de10.eq_set_freq(slider7);
+de11.eq_set_freq(slider7);
+de12.eq_set_freq(slider7);
+de13.eq_set_freq(slider7);
+de14.eq_set_freq(slider7);
+de15.eq_set_freq(slider7);
+de16.eq_set_freq(slider7);
+
+de1.eq_set_boost(-slider6);
+de2.eq_set_boost(-slider6);
+de3.eq_set_boost(-slider6);
+de4.eq_set_boost(-slider6);
+de5.eq_set_boost(-slider6);
+de6.eq_set_boost(-slider6);
+de7.eq_set_boost(-slider6);
+de8.eq_set_boost(-slider6);
+de9.eq_set_boost(-slider6);
+de10.eq_set_boost(-slider6);
+de11.eq_set_boost(-slider6);
+de12.eq_set_boost(-slider6);
+de13.eq_set_boost(-slider6);
+de14.eq_set_boost(-slider6);
+de15.eq_set_boost(-slider6);
+de16.eq_set_boost(-slider6);
+
+//Input-amp Soft clipper
+gain = 2^(slider15/6) * nominal;
+ceiling = 10^(slider16/20);
+// Scalar to get output of tanh(x) to -1..1 bounds regardless of the gain:
+invGain = 1/(tanh(gain));
+
+s=21;
+loop(num_ch/2,
+  slider(s) = min(max(slider(s), gainMin), gainMax);
+  s+=1;
+  );
+/*
+slider21 = min(max(slider21, gainMin), gainMax);
+slider22 = min(max(slider22, gainMin), gainMax);
+slider23 = min(max(slider23, gainMin), gainMax);
+slider24 = min(max(slider24, gainMin), gainMax);
+slider25 = min(max(slider25, gainMin), gainMax);
+slider26 = min(max(slider26, gainMin), gainMax);
+slider27 = min(max(slider27, gainMin), gainMax);
+slider28 = min(max(slider28, gainMin), gainMax);
+*/
+
+levelA = 2 ^ (slider21 / 6);
+levelB = 2 ^ (slider22 / 6);
+levelC = 2 ^ (slider23 / 6);
+levelD = 2 ^ (slider24 / 6);
+levelE = 2 ^ (slider25 / 6);
+levelF = 2 ^ (slider26 / 6);
+levelG = 2 ^ (slider27 / 6);
+levelH = 2 ^ (slider28 / 6);
+
+
+//Saturation
+//Input
+foo = slider10/200*$pi;
+bar = sin(slider10/200*$pi);
+
+@block
+
+@sample
+//Input gain
+spl0*=levelA;
+spl1*=levelA;
+spl2*=levelB;
+spl3*=levelB;
+spl4*=levelC;
+spl5*=levelC;
+spl6*=levelD;
+spl7*=levelD;
+spl8*=levelE;
+spl9*=levelE;
+spl10*=levelF;
+spl11*=levelF;
+spl12*=levelG;
+spl13*=levelG;
+spl14*=levelH;
+spl15*=levelH;
+
+
+//Pre-emphasis
+slider6 != 0 ? (
+ spl0 = pe1.eq_do(spl0);
+ spl1 = pe2.eq_do(spl1);
+ spl2 = pe3.eq_do(spl2);
+ spl3 = pe4.eq_do(spl3);
+ spl4 = pe5.eq_do(spl4);
+ spl5 = pe6.eq_do(spl5);
+ spl6 = pe7.eq_do(spl6);
+ spl7 = pe8.eq_do(spl7);
+ spl8 = pe9.eq_do(spl8);
+ spl9 = pe10.eq_do(spl9);
+ spl10 = pe11.eq_do(spl10);
+ spl11 = pe12.eq_do(spl11);
+ spl12 = pe13.eq_do(spl12);
+ spl13 = pe14.eq_do(spl13);
+ spl14 = pe15.eq_do(spl14);
+ spl15 = pe16.eq_do(spl15);
+);
+
+//Bleed level and bleed saturation (same as global)
+slider35 != 0 ? (
+  bleed=0;
+  b=0;
+  loop(num_ch,
+    slider10 != 0 ? (
+    bleed+=(saturate(spl(b))*0.00001);
+      ) : (
+        bleed+=(spl(b))*0.00001;
+        );
+    b+=1;
+  );
+  f=0;
+  loop(num_ch,
+    spl(f)+=bleed*(2^(slider35/6));
+    f+=1;
+  );
+);
+
+//Input saturation
+slider10 ? (
+  i=0;
+  loop(num_ch,
+    spl(i) = saturate(spl(i));
+    i+=1;
+    );
+);
+/*spl0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+spl2 = min(max( sin(max(min(spl2,1),-1)*foo)/bar ,-1) ,1);
+spl3 = min(max( sin(max(min(spl3,1),-1)*foo)/bar ,-1) ,1);
+spl4 = min(max( sin(max(min(spl4,1),-1)*foo)/bar ,-1) ,1);
+spl5 = min(max( sin(max(min(spl5,1),-1)*foo)/bar ,-1) ,1);
+spl6 = min(max( sin(max(min(spl6,1),-1)*foo)/bar ,-1) ,1);
+spl7 = min(max( sin(max(min(spl7,1),-1)*foo)/bar ,-1) ,1);
+spl8 = min(max( sin(max(min(spl8,1),-1)*foo)/bar ,-1) ,1);
+spl9 = min(max( sin(max(min(spl9,1),-1)*foo)/bar ,-1) ,1);
+spl10 = min(max( sin(max(min(spl10,1),-1)*foo)/bar ,-1) ,1);
+spl11 = min(max( sin(max(min(spl11,1),-1)*foo)/bar ,-1) ,1);
+spl12 = min(max( sin(max(min(spl12,1),-1)*foo)/bar ,-1) ,1);
+spl13 = min(max( sin(max(min(spl13,1),-1)*foo)/bar ,-1) ,1);
+spl14 = min(max( sin(max(min(spl14,1),-1)*foo)/bar ,-1) ,1);
+spl15 = min(max( sin(max(min(spl15,1),-1)*foo)/bar ,-1) ,1);
+);*/
+
+//De-emphasis
+slider6 != 0 ? (
+ spl0 = de1.eq_do(spl0);
+ spl1 = de2.eq_do(spl1);
+ spl2 = de3.eq_do(spl2);
+ spl3 = de4.eq_do(spl3);
+ spl4 = de5.eq_do(spl4);
+ spl5 = de6.eq_do(spl5);
+ spl6 = de7.eq_do(spl6);
+ spl7 = de8.eq_do(spl7);
+ spl8 = de9.eq_do(spl8);
+  spl9 = de10.eq_do(spl9);
+ spl10 = de11.eq_do(spl10);
+ spl11 = de12.eq_do(spl11);
+ spl12 = de13.eq_do(spl12);
+ spl13 = de14.eq_do(spl13);
+ spl14 = de15.eq_do(spl14);
+ spl15 = de16.eq_do(spl15);
+);
+
+//Soft clipper
+slider15 != 0 ? (
+  a=0;
+  loop(16,
+    spl(a)=clipper(spl(a));
+    a+=1;
+    );
+  );
+/*
+spl0=tanh(spl0*gain)*invGain;
+spl1=tanh(spl1*gain)*invGain;
+spl2=tanh(spl2*gain)*invGain;
+spl3=tanh(spl3*gain)*invGain;
+spl4=tanh(spl4*gain)*invGain;
+spl5=tanh(spl5*gain)*invGain;
+spl6=tanh(spl6*gain)*invGain;
+spl7=tanh(spl7*gain)*invGain;
+spl8=tanh(spl8*gain)*invGain;
+spl9=tanh(spl9*gain)*invGain;
+spl10=tanh(spl10*gain)*invGain;
+spl11=tanh(spl11*gain)*invGain;
+spl12=tanh(spl12*gain)*invGain;
+spl13=tanh(spl13*gain)*invGain;
+spl14=tanh(spl14*gain)*invGain;
+spl15=tanh(spl15*gain)*invGain;
+// Hard limit in case input goes over 0dBFS:
+spl0=max(min(spl0,1),-1);
+spl1=max(min(spl1,1),-1);
+spl2=max(min(spl2,1),-1);
+spl3=max(min(spl3,1),-1);
+spl4=max(min(spl4,1),-1);
+spl5=max(min(spl5,1),-1);
+spl6=max(min(spl6,1),-1);
+spl7=max(min(spl7,1),-1);
+spl8=max(min(spl8,1),-1);
+spl9=max(min(spl9,1),-1);
+spl10=max(min(spl10,1),-1);
+spl11=max(min(spl11,1),-1);
+spl12=max(min(spl12,1),-1);
+spl13=max(min(spl13,1),-1);
+spl14=max(min(spl14,1),-1);
+spl15=max(min(spl15,1),-1);
+);
+
+// Bring down to ceiling volume:
+spl0*=ceiling;
+spl1*=ceiling;
+spl2*=ceiling;
+spl3*=ceiling;
+spl4*=ceiling;
+spl5*=ceiling;
+spl6*=ceiling;
+spl7*=ceiling;
+spl8*=ceiling;
+spl9*=ceiling;
+spl10*=ceiling;
+spl11*=ceiling;
+spl12*=ceiling;
+spl13*=ceiling;
+spl14*=ceiling;
+spl15*=ceiling;
+*/

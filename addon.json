@@ -1,0 +1,13 @@
+{
+    "name": "JSFX pack",
+    "raw_name": "jsfx_pack",
+    "kind": "media",
+    "short": "JSFX audio and MIDI effects and utilities",
+    "key": "607d2d0c-4305-49cd-9ae9-b096a7e68bb8",
+    "license": "(c) Respective Authors. LGPL, GPL, MIT, ...",
+    "size": "250M",
+    "version": 1,
+    "file": "https://github.com/jcelerier/jsfxlib/archive/refs/heads/main.zip",
+    "url": "https://github.com/jcelerier/jsfxlib"
+}
+

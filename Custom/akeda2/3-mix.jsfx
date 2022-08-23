@@ -1,0 +1,55 @@
+desc:3-channel to stereo mixer 1,2 is L,R. 3 is Center. 4 is spot.
+
+in_pin:Left
+in_pin:Right
+in_pin:Center
+in_pin:Spot
+out_pin:Left
+out_pin:Right
+
+slider1:-6<-90,10,1>Stereo-LR
+slider2:-6<-90,10,1>Center
+slider3:-90<-90,10,1>Spot
+slider4:0<-12,12,0.1>Crossfade LR <-> Center
+
+@init
+bpos=0;
+
+@slider
+stereolevel = 10^(slider1/20);
+centerlevel = 10^(slider2/20);
+spotlevel = 10^(slider3/20);
+
+//Borrowed crossfade:
+slider4 < -40 ? slider4 = -40;
+slider4 > 40 ? slider4 = 40;
+
+mixPercent = slider4;
+mixPercent == 40 ? mixPercent = 100;
+mixPercent == -40 ? mixPercent = -100;
+slider4 <= 0 ?
+(
+crossT1 = 1;
+crossT2 = 2 ^ ( mixPercent/ 6 );
+) :
+(
+crossT1 = 2 ^ ( -mixPercent / 6 );
+crossT2 = 1;
+);
+
+
+@block
+blah+=samplesblock;
+
+@sample
+//inputs
+inL = spl0;
+inR = spl1;
+inC = spl2;
+inSpot = spl3;
+//output
+spl0 = (inL*stereolevel*crossT1) + (inC*centerlevel*crossT2) + (inSpot*spotlevel);
+spl1 = (inR*stereolevel*crossT1) + (inC*centerlevel*crossT2) + (inSpot*spotlevel);
+spl2 = null;
+spl3 = null;
+

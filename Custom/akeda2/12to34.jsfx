@@ -1,0 +1,14 @@
+desc:Copy ch1,2 to 3,4
+
+@init
+bpos=0;
+
+@slider
+
+@block
+
+@sample
+spl0=spl0;
+spl1=spl1;
+spl2=spl0;
+spl3=spl1;

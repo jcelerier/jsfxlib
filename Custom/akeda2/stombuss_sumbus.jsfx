@@ -1,0 +1,122 @@
+desc:Stombuss 2 modular 8/16->2ch summing/mixing bus
+//tags: summing mixer saturation clipping authentic analog vintage magic expensive
+//author: Akeda
+
+import cookdsp.jsfx-inc
+
+
+slider21:0<-60,6,0.1>Mixer level (dB) 1/2
+slider22:0<-60,6,0.1>3/4
+slider23:0<-60,6,0.1>5/6
+slider24:0<-60,6,0.1>7/8
+slider25:0<-60,6,0.1>9/10
+slider26:0<-60,6,0.1>11/12
+slider27:0<-60,6,0.1>13/14
+slider28:0<-60,6,0.1>15/16
+
+slider30:0<-60,20,0.1>MASTER output stage gain/pad (dB)
+slider35:0<0,24,0.1>Output stage crosstalk/bleed (dB)
+
+slider50:0<-12,6,0.1>Output trim(2ch) gain/pad (dB)
+
+in_pin:Input 1
+in_pin:Input 2
+in_pin:Input 3
+in_pin:Input 4
+in_pin:Input 5
+in_pin:Input 6
+in_pin:Input 7
+in_pin:Input 8
+in_pin:Input 9
+in_pin:Input 10
+in_pin:Input 11
+in_pin:Input 12
+in_pin:Input 13
+in_pin:Input 14
+in_pin:Input 15
+in_pin:Input 16
+
+out_pin:left output
+out_pin:right output
+
+@init
+bpos=0;
+gainMin = -60;
+gainMax = 30;
+itm1=itm2=otm1=otm2=0;
+
+
+@slider
+
+slider21 = min(max(slider21, gainMin), gainMax);
+slider22 = min(max(slider22, gainMin), gainMax);
+slider23 = min(max(slider23, gainMin), gainMax);
+slider24 = min(max(slider24, gainMin), gainMax);
+slider25 = min(max(slider25, gainMin), gainMax);
+slider26 = min(max(slider26, gainMin), gainMax);
+slider27 = min(max(slider27, gainMin), gainMax);
+slider28 = min(max(slider28, gainMin), gainMax);
+
+levelA = 2 ^ (slider21 / 6);
+levelB = 2 ^ (slider22 / 6);
+levelC = 2 ^ (slider23 / 6);
+levelD = 2 ^ (slider24 / 6);
+levelE = 2 ^ (slider25 / 6);
+levelF = 2 ^ (slider26 / 6);
+levelG = 2 ^ (slider27 / 6);
+levelH = 2 ^ (slider28 / 6);
+
+//Output gain/pad
+slider30 = min(max(slider30, gainMin), gainMax);
+L_Mlevel = 2 ^ (slider30 / 6);
+R_Mlevel = 2 ^ (slider30 / 6);
+
+//Crosstalk
+crosstalk = 2 ^ (-slider35 / 6);
+
+slider50 = min(max(slider50, gainMin), gainMax);
+L_level = 2 ^ (slider50 / 6);
+R_level = 2 ^ (slider50 / 6);
+
+@block
+blah+=samplesblock;
+
+@sample
+
+//Mixing level
+spl0 =  (spl0 * levelA)  + 
+    (spl2 * levelB) + 
+    (spl4 * levelC) + 
+    (spl6 * levelD) + 
+    (spl8 * levelE) + 
+    (spl10 * levelF)+ 
+    (spl12 * levelG)+ 
+    (spl14 * levelH);
+
+// Do the right mix
+spl1 =   (spl1 * levelA)  + 
+    (spl3 * levelB) + 
+    (spl5 * levelC) + 
+    (spl7 * levelD) + 
+    (spl9 * levelE) + 
+    (spl11 * levelF)+ 
+    (spl13 * levelG)+ 
+    (spl15 * levelH);
+
+spl2=spl3=spl4=spl5=spl6=spl7=spl8=spl9=spl10=spl11=spl12=spl13=spl14=spl15=0;
+
+//Master level
+spl0 = (spl0 * L_Mlevel);
+spl1 = (spl1 * R_Mlevel);
+
+//Crosstalk
+slider35 != 0 ? (
+sum = (spl0+spl1)*0.5;
+diff = (spl0-spl1)*0.5;
+spl0 = sum+(diff*crosstalk);
+spl1 = sum-(diff*crosstalk);
+);
+
+//Output level
+spl0 = (spl0 * L_level);
+spl1 = (spl1 * R_level);

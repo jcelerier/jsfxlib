@@ -1,0 +1,80 @@
+// Copyright (C) 2008  Chris Rossi
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Induces crossover distortion by zeroing any sample below a certain
+// threshold.  In terrible mode, the threshold is fixed.  In awful
+// (aka smart) mode the threshold is proportional to the rms of the 
+// audio coming in.  If you are in awful mode and on a track with 4 or 
+// channels, the rms envelope can be optionally generated from channels
+// 3 and 4, allowing for sidechain combinations that are not at all
+// recommended.
+
+desc: spacelab horrifier (crossover distortion)
+
+slider1:0<0,100>horror
+slider2:0<0,1,1{terrible,awful}>mode
+slider3:100<0,100>blend
+slider4:0<0,1,1{1 and 2,3 and 4}>envelope source
+slider5:0<0,1,1{off,on}>monitor sidechain
+
+@init 
+env_size = 128;
+filling_buf = 1;
+l_env_sum = r_env_sum = 0;
+l_env_buf = 0; r_env_buf = env_size;
+l_env = r_env = 0;
+env_index = 0;
+
+@slider
+blend =  1 - slider3 / 100;
+smart_mode = slider2;
+smart_mode ?
+  cutoff = 10^((slider1/5-20)/20):
+  cutoff = 10^((slider1*3/5-60)/20);
+slider4 = side_chain = slider4 && num_ch > 2 && smart_mode;
+slider5 = monitor_sidechain = slider5 && side_chain
+
+@sample
+l2 = side_chain ? spl2*spl2 : spl0*spl0;
+r2 = side_chain ? spl3*spl3 : spl1*spl1;
+! filling_buf && smart_mode ? (
+    // Drop old sample out of envelope
+    l_env_sum -= l_env_buf[env_index];
+    r_env_sum -= r_env_buf[env_index];
+
+    // Add next sample into envelope
+    l_env_sum += l2;
+    r_env_sum += r2;
+
+    // Calculate envelope
+    l_env = sqrt( l_env_sum / env_size );
+    r_env = sqrt( r_env_sum / env_size );
+);
+
+// Store current sample in buffer
+l_env_buf[env_index] = l2;
+r_env_buf[env_index] = r2;
+env_index += 1;
+env_index == env_size ? ( 
+  filling_buf = env_index = 0;
+);
+
+monitor_sidechain ? (
+  spl0 = spl2;
+  spl1 = spl3;
+) : (
+  spl0 = abs(spl0) < ( smart_mode ? cutoff * l_env : cutoff ) ? spl0 * blend : spl0;
+  spl1 = abs(spl1) < ( smart_mode ? cutoff * r_env : cutoff ) ? spl1 * blend : spl1;
+)

@@ -1,0 +1,110 @@
+desc:Pultrek - Parametric EQ
+
+import cookdsp.jsfx-inc
+
+slider1:1<0,1,1>On/Bypass
+slider2:0<0,24,0.1>LF Boost(dB)
+slider3:0<0,24,0.1>LF Cut(dB)
+slider4:100<20,800,10>LF Boost/Cut Freq(Hz)
+slider5:5000<3000,16000,1000>HF Boost Freq(Hz)
+slider6:0<0,24,0.1>HF Boost(dB)
+slider7:1<0.1,10,1>HF Bandwidth(q)
+slider8:0<0,24,1>HF Cut(dB)
+slider9:5000<3000,20000,1000>HF Cut freq(Hz)
+
+@init
+bpos=0;
+
+//dc_remove
+itm1=itm2=otm1=otm2=0;
+
+//Bass boost
+LBB.eq(slider4,1,slider2,1);
+RBB.eq(slider4,1,slider2,1);
+
+//Bass notch
+LBN.eq(slider4,1,-slider3,0);
+RBN.eq(slider4,1,-slider3,0);
+
+//Treble peak
+LTP.eq(slider5,slider7,slider6,0);
+RTP.eq(slider5,slider7,slider6,0);
+
+//Low shelf
+LLS.eq(slider9,0.5,slider8,2);
+RLS.eq(slider9,0.5,slider8,2);
+
+//Soft clipper
+nominal = 0.5;
+function tanh(x) (exp(x)-exp(-x)) / (exp(x)+exp(-x));
+function saturate(x)
+(
+  x = min(max( sin(max(min(x,1),-1)*foo2)/bar2 ,-1) ,1);
+);
+function clipper(in)
+(
+    in = tanh(in*gain)*invGain;
+    in = max(min(in,1),-1);
+    in *= ceiling;
+);
+function clip2(in gain invGain ceiling)
+(
+    in = tanh(in*gain)*invGain;
+    in = max(min(in,1),-1);
+    in *= ceiling;
+);
+
+@slider
+foo=80/200*$pi;
+bar = sin(80/200*$pi);
+//Bass boost
+LBB.eq_set_freq(slider4);
+RBB.eq_set_freq(slider4);
+LBB.eq_set_boost(slider2);
+RBB.eq_set_boost(slider2);
+
+//Bass notch
+LBN.eq_set_freq(slider4);
+RBN.eq_set_freq(slider4);
+LBN.eq_set_boost(-slider3);
+RBN.eq_set_boost(-slider3);
+
+//Treble boost
+LTP.eq_set_freq(slider5);
+RTP.eq_set_freq(slider5);
+LTP.eq_set_boost(slider6);
+RTP.eq_set_boost(slider6);
+LTP.eq_set_q(slider7);
+RTP.eq_set_q(slider7);
+
+//Low shelf
+LLS.eq_set_freq(slider9);
+RLS.eq_set_freq(slider9);
+LLS.eq_set_boost(-slider8);
+RLS.eq_set_boost(-slider8);
+
+//Output-amp Soft clipper
+gain = 2^(3/6) * nominal;
+ceiling = 10^(-3/20);
+// Scalar to get output of tanh(x) to -1..1 bounds regardless of the gain:
+invGain = 1/(tanh(gain));
+
+@block
+
+@sample
+slider1 != 0 ? (
+  spl0 = LBB.eq_do(LBN.eq_do(LTP.eq_do(LLS.eq_do(spl0))));
+  spl1 = RBB.eq_do(RBN.eq_do(RTP.eq_do(RLS.eq_do(spl1))));
+  );
+
+//Clipper
+spl0 = clipper(spl0);
+spl1 = clipper(spl1);
+//Saturation
+spl0 = min(max( sin(max(min(spl0,1),-1)*foo)/bar ,-1) ,1);
+spl1 = min(max( sin(max(min(spl1,1),-1)*foo)/bar ,-1) ,1);
+
+//DC-remove
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+

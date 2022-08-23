@@ -1,0 +1,148 @@
+Ldesc:Variable RIAA-filter
+
+import cookdsp.jsfx-inc
+//import wuff/st-oversampler.jsfx-inc
+
+slider1:500<200,1000,1>Low turnover (Hz)
+slider2:24<0,60,0.5>Bass boost (dB)
+slider3:2122<1000,6360,1>Midrange turnover (Hz)
+slider4:15000<2000,20000,1>High-cut (Hz)
+slider5:0<0,2,1{6dB/oct,12dB/oct,off}>High-cut type/off
+slider6:0<-60,18,0.5>q10 HF-scratch notch filter (dB, neg or pos)
+slider7:10000<4000,15000,1>HF-scratch filter frequency (Hz)
+slider9:25<5,100,1>24dB/oct Rumble filter frequency (Hz)
+slider10:0<0,1,1{on,off}>Rumble filter on/off
+slider11:0<0,2,1{stereo,mono(-6dB),mono}>Stereo/Mono
+slider12:0<0,1,1{on,off}>DC-filter
+slider13:0<-32,32,0.1>Output pad/gain (dB)
+
+
+@init
+bpos=0;
+//dc_remove
+itm1=itm2=otm1=otm2=0;
+
+//Midrange-turnover
+LM.lop(slider3);
+RM.lop(slider3);
+
+//High-cut
+//1:st order
+LHcut.lop(slider4);
+RHcut.lop(slider4);
+//2:nd order
+LHc.butlp(slider4);
+RHc.butlp(slider4);
+
+//Low-turnover
+LL.lop(slider1/10);
+LR.lop(slider1/10);
+//HF-scrap
+LS.eq(slider7,10,slider6,0);
+RS.eq(slider7,10,slider6,0);
+//Rumble
+LR.buthp(slider9);
+RR.buthp(slider9);
+LR2.buthp(slider9);
+RR2.buthp(slider9);
+
+
+@slider
+//MF-turnover
+LM.lop_set_freq(slider3);
+RM.lop_set_freq(slider3);
+//LF-boost
+LL.lop_set_freq(slider1/10);
+LR.lop_set_freq(slider1/10);
+gain=10^((slider2)/20);
+//HF-cut
+LHcut.lop_set_freq(slider4);
+RHcut.lop_set_freq(slider4);
+LHc.butlp_set_freq(slider4);
+RHc.butlp_set_freq(slider4);
+//HF-scrap
+LS.eq_set_freq(slider7);
+RS.eq_set_freq(slider7);
+LS.eq_set_boost(slider6);
+RS.eq_set_boost(slider6);
+//Rumble-filter
+LR.buthp_set_freq(slider9);
+RR.buthp_set_freq(slider9);
+LR2.buthp_set_freq(slider9);
+RR2.buthp_set_freq(slider9);
+//Gain/pad
+gainpad=10^((slider13)/20);
+
+@block
+blah+=samplesblock;
+
+@sample
+
+//Oversampling (dosn't work)
+//osL.os_up2(spl0);
+//spl1 = osR.os_up2(spl1);
+
+//Left-HP-LP
+outLL = LL.lop_do(spl0)*gain;
+slider5 != 2 ? (
+ slider5 == 1 ? (
+  outLH = LHc.butlp_do(LM.lop_do(spl0)+outLL);
+  );
+ slider5 == 0 ? (
+  outLH = LHcut.lop_do(LM.lop_do(spl0)+outLL);
+  );
+ ):(
+  outLH = LM.lop_do(spl0)+outLL;
+  );
+
+//Right-HP-LP
+outRL = LR.lop_do(spl1)*gain;
+slider5 != 2 ? (
+ slider5 == 1 ? (
+  outRH = RHc.butlp_do(RM.lop_do(spl1)+outRL);
+  );
+ slider5 == 0 ? (
+  outRH = RHcut.lop_do(RM.lop_do(spl1)+outRL);
+  );
+ ):(
+  outRH = RM.lop_do(spl1)+outRL;
+  );
+
+spl0=outLH;
+spl1=outRH;
+
+//HF-notch
+slider6 != 0 ? (
+ spl0 = LS.eq_do(spl0);
+ spl1 = RS.eq_do(spl1);
+);
+
+//Rumble-filter 2x12dB
+slider10 == 0 ? (
+ spl0 = LR.buthp_do(LR2.buthp_do(spl0));
+ spl1 = RR.buthp_do(RR2.buthp_do(spl1));
+ );
+
+//Stereo/mono-switch
+slider11 != 0 ? (
+ spl0 = spl1 = (spl0+spl1);
+  slider11 == 1 ? (
+   spl0*=0.5;
+   spl1*=0.5;
+   );
+ );
+ 
+//Gain/pad
+spl0 *= gainpad;
+spl1 *= gainpad;
+
+//dc_remove
+slider12 == 0 ? (
+ otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+ otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+ );
+
+//spl0 = osL.os_down2();
+//spl1 = osR.os_down2();
+
+

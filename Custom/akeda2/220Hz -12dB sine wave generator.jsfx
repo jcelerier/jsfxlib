@@ -1,0 +1,20 @@
+desc: 440Hz -23dB sine wave generator
+//tags: 3150kHz sine generator
+//author: akeda
+
+@init
+step=1/srate;
+t=0;
+
+@slider
+two_pi_freq = 2 * $pi * 220;
+gain = 10^(-23/20);
+
+@block
+t > 10000 ? t -= 10000;
+
+@sample
+sineSig = sin( two_pi_freq * t ) * gain;
+spl0 += sineSig;
+spl1 += sineSig;
+t += step;

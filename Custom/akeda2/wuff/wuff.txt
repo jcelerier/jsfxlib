@@ -1,0 +1,310 @@
+desc:Wuff Distortion (with oversampling)
+
+//tags: guitar distortion waveshaper
+//author: chris-s
+//version: 1.0
+//date: 2016-01-29
+//Disclaimer: Usage is on own risk
+//This software is freeware
+
+// changelog
+// 2016-04-01
+// * oversampling overhauled by Sault
+//
+// 2016-02-12
+// * oversampling added by Sault
+//   (courtesy of Tale's oversampling library)
+// * dc blocker courtesy of dc_remove
+
+// Info: http://www.electrosmash.com/big-muff-pi-analysis
+// Info: http://bigmuffpage.com
+
+slider1:55<0,100,1>VOLUME
+slider2:55<0,100,1>TONE
+slider3:40<0,100,1>SUSTAIN
+slider4:0<0,3,1{1x,2x,4x,8x}>AA
+slider5:5000<100,20000,1>Lowpass (Hz)
+
+import st-oversampler.jsfx-inc
+import rbj_filter.jsfx-inc
+
+filename:0,wuff-gui1.png
+
+
+@init
+
+// z1=z2=z3=z4=z5=z6=z7=0;
+
+itm1=itm2=otm1=otm2=0;
+
+
+gain0 = 1;
+gain1 = 14.1; // 23 dB
+gain2 = 17.8; // 25 dB
+
+
+// modelling the asymmetric input stage
+
+function asymclip(x) local(y)
+(
+ 
+ x = x * 0.106 + 0.25 ; 
+
+ x <= 0 ?
+  y = x * 15.5122 - 2.69922 : 
+ x  < 0.07653 ?
+  y = -13.309756*x*x*x + 15.51569*x - 2.69922 :
+ x < 0.15355 ?
+  y = -26.328981*x*x*x + 2.989084*x*x + 15.286935*x - 2.693384 :
+ x < 0.19355 ?
+  y = -82.647374*x*x*x + 28.932151*x*x + 11.303377*x - 2.489493 :
+ x < 0.21355 ?
+  y = -216.407553*x*x*x + 106.6*x*x - 3.729235*x - 1.519639 :
+ x < 0.23355 ?
+  y = -214.757605*x*x*x + 105.54296*x*x - 3.503504*x - 1.535707 :
+ x < 0.25355 ?
+  y = -718.312027*x*x*x + 458.358366*x*x - 85.903542*x + 4.879136 :
+ x < 0.31355 ?
+  y = 325.480384*x*x*x - 335.602331*x*x + 115.405193*x - 12.134807 :
+ x < 0.35355 ?
+  y = 269.625134*x*x*x - 283.062091*x*x + 98.931201*x - 10.413 :
+ x < 0.42 ?
+  y =  -17.944895*x*x*x + 21.949061*x*x - 8.905492*x + 2.295554 :
+ x < 0.5 ?
+  y = 2.75628*x*x*x - 4.134419*x*x + 2.049569*x + 0.761845 :
+ y = 1.09756; 
+
+ y;  
+);
+
+
+// modelling the diode clipping
+
+function softclip(x) local(y sg)
+(
+ sg = sign(x);
+ x = abs(x);
+
+ x < 0.2868 ?
+  y = -0.253547*x*x*x + 1.015242*x :
+ x < 0.44305 ?
+  y = -3.213782*x*x*x + 2.546986*x*x + 0.284766*x + 0.069833 :
+ x < 0.56024 ?
+  y = 2.4945*x*x*x - 5.040176*x*x + 3.646258*x - 0.426603 :
+ x < 0.63837 ?
+  y = 1.572526*x*x*x - 3.490596*x*x + 2.778122*x - 0.264481 :
+ x < 0.75555 ?
+  y = 0.741219*x*x*x - 1.898552*x*x + 1.761808*x - 0.04822 :
+ x < 1.10712 ?
+  y = 0.174563*x*x*x - 0.614142*x*x + 0.791372*x + 0.196184 :
+ x <2.25109 ?
+  y = 0.008158*x*x*x - 0.061451*x*x + 0.179477*x + 0.421998 :
+ x < 4.26 ?
+  y = 0.0009024*x*x*x - 0.012449*x*x + 0.06917*x + 0.504769 :
+ x < 9.92408 ?
+  y = 0.0000392*x*x*x - 0.001427*x*x + 0.022215*x + 0.571445 :
+ x < 20 ?
+  y = 0.00000829*x*x*x - 0.000497*x*x + 0.012983*x + 0.601986 :
+ y = 0.72919;
+ 
+ y * sg;
+);
+
+
+// limit the sliders (by default the entered values are not checked)
+
+function limit(x) 
+(
+   min(max(x,0),100);
+);
+
+
+function process(s)
+  instance(a1,b1,z1,a2,b2,z2,a3,b3,z3,a4,b4,z4,a5,b5,z5,a6,b6,z6,a7,b7,z7,s_lo,s_hi)
+(
+
+//  s = s * gain0;
+
+
+  s = asymclip(s);
+
+
+  // filter input
+
+  z3 = s * a3 + z3 * b3;
+  s = s - z3;
+
+  z1 = s * a1 + z1 * b1;
+  s = z1;
+
+  // stage1
+
+  s = s * gain1;
+  s = softclip(s);
+
+  s=this.lp0.rbj_df1(s);
+
+  // filter stage1
+
+  z2 = s * a2 + z2 * b2;
+  s = z2;
+
+  z5 = s * a5 + z5 * b5;
+  s = s - z5;
+
+  // stage2 
+
+  s = s * gain2;
+  s = softclip(s);
+
+  s=this.lp1.rbj_df1(s);
+
+  // filter stage2
+
+  z4 = s * a4 + z4 * b4;
+  s = z4;
+
+  // tone
+
+  z6 = s * a6 + z6 * b6;
+  s_lo = z6;
+
+  z7 = s * a7 + z7 * b7;
+  s_hi = s - z7;
+
+  s = s_lo * tone_lo + s_hi * tone_hi;
+//  s = s * vol;
+
+);
+
+function process2(x)
+  instance(os2.y1, os2.y0)
+(
+  this.os2.os_up2(x);
+  os2.y1 = this.process(os2.y1);
+  os2.y0 = this.process(os2.y0);
+  this.os2.os_down2();
+);
+
+function process4(x)
+  instance(os4.y1, os4.y0)
+(
+  this.os4.os_up2(x);
+  os4.y1 = this.process2(os4.y1);
+  os4.y0 = this.process2(os4.y0);
+  this.os4.os_down2();
+);
+
+function process8(x)
+  instance(os8.y1, os8.y0)
+(
+  this.os8.os_up2(x);
+  os8.y1 = this.process4(os8.y1);
+  os8.y0 = this.process4(os8.y0);
+  this.os8.os_down2();
+);
+
+pdc_bot_ch = 0; pdc_top_ch = 2;
+
+delay[0] = 0;
+delay[1] = 9; // int(n = ((fir_len = 19) - 1) / 2)
+delay[2] = 13; // int(n + n/2)
+delay[3] = 15; // int(n + n/2 + n/4)
+
+
+function set_coeffs()
+ instance(a1,a2,a3,a4,a5,a6,a7,b1,b2,b3,b4,b5,b6,b7,fc1,fc2,fc3,fc4,fc5,fc6,fc7,lp0,lp1)
+(
+  //filter coefficients
+  // (for distortion simple IIR filters are good enough)
+
+  fc1 = 1250 / (srate * 2^os);  //Input LP 
+  fc2 = 2000 / (srate * 2^os);  //Stage1 LP 
+  fc3 = 90   / (srate * 2^os);  //Input HP
+  fc4 = 5000 / (srate * 2^os);  //Stage2 LP
+  fc5 = 90   / (srate * 2^os);  //Stage1 HP
+  fc6 = 470  / (srate * 2^os);  //Tone LP
+  fc7 = 1950 / (srate * 2^os);  //Tone HP
+
+
+  b1 = exp( -2 * $pi * fc1); a1 = 1 - b1;
+  b2 = exp( -2 * $pi * fc2); a2 = 1 - b2;
+  b3 = exp( -2 * $pi * fc3); a3 = 1 - b3;
+  b4 = exp( -2 * $pi * fc4); a4 = 1 - b4;
+  b5 = exp( -2 * $pi * fc5); a5 = 1 - b5;
+  b6 = exp( -2 * $pi * fc6); a6 = 1 - b6;
+  b7 = exp( -2 * $pi * fc7); a7 = 1 - b7;
+
+  lp0.rbj_lp( slider5/2^os, 1);
+  lp1.rbj_lp( slider5/2^os, 1);
+);
+
+
+
+@slider
+
+vol     = limit(slider1) / 100 * 2.0;
+tone_hi = limit(slider2) / 100;
+tone_lo = 1.0 - limit(slider2) / 100;
+gain0 = (limit(slider3) + 10) ^ 2 / 2300;
+
+
+os = slider4;
+pdc_delay = delay[os];
+
+  left.set_coeffs();
+  right.set_coeffs();
+
+  
+
+@sample
+
+spl0 *= gain0;
+spl1 *= gain0;
+
+os == 1 ? (
+  spl0 = left.process(spl0);
+  spl1 = right.process(spl1);
+) :
+os == 2 ? (
+  spl0 = left.process2(spl0);
+  spl1 = right.process2(spl1);
+) :
+os == 3 ? (
+  spl0 = left.process4(spl0);
+  spl1 = right.process4(spl1);
+) :
+ /* os == 4 ? */ (
+  spl0 = left.process8(spl0);
+  spl1 = right.process8(spl1);
+);
+
+spl0 *= vol;
+spl1 *= vol;
+
+
+// straight from dc_remove
+
+otm1=0.999*otm1 + spl0 - itm1; itm1=spl0; spl0=otm1;
+otm2=0.999*otm2 + spl1 - itm2; itm2=spl1; spl1=otm2;
+
+
+
+@gfx
+
+// show gui
+
+gfx_r=gfx_g=gfx_b=0.9; 
+gfx_a=1;
+
+gfx_x=gfx_y=0;
+gfx_rectto(gfx_w,gfx_h);
+
+gfx_x = max(5, (gfx_w - 280) / 2);
+gfx_y = 5;
+
+gfx_blit(0, 1.0, 0.0);
+
+
+
+

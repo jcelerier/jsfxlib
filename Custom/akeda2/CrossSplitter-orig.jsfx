@@ -1,0 +1,125 @@
+desc:2- CrossSplitter (Komposit Crossfade Sample2:CH1+2, Komposit Crossfade Sample1:CH3+4)
+slider1:200<0,22000,1>Frequency (Hz) Track 1
+slider2:200<0,22000,1>Frequency (Hz) Track 2
+
+slider3:0<-90,10,0.1>Track 1 (channel 1,2) (dB)
+slider4:0<-90,10,0.1>Track 2 (channel 3,4) (dB)
+slider5:0<-40,40,0.1>Crossfade
+
+slider6:1<0, 1, 1{Low, High}>Use part of Sample 1 to create komposit
+slider7:0<0, 1, 1{Low, High}>Use part of Sample 2 to create komposit
+
+
+@init
+cDenorm=10^-30;
+gainMax = 10;
+gainMin = -90;
+sliderPos = 0;
+
+@slider
+
+freqLow1 = min(slider1,srate);
+xLow1 = exp(-2.0*$pi*freqLow1/srate);
+a0Low1 = 1.0-xLow1;
+b1Low1 = -xLow1;
+
+freqLow2 = min(slider2,srate);
+xLow2 = exp(-2.0*$pi*freqLow2/srate);
+a0Low2 = 1.0-xLow2;
+b1Low2 = -xLow2;
+
+slider3 < gainMin ? slider3 = gainMin;
+slider3 > gainMax ? slider3 = gainMax;
+levelT1 = 2 ^ ( slider3 / 6 );
+
+slider4 < gainMin ? slider4 = gainMin;
+slider4 > gainMax ? slider4 = gainMax;
+levelT2 = 2 ^ ( slider4 / 6 );
+
+slider5 < -40 ? slider5 = -40;
+slider5 > 40 ? slider5 = 40;
+
+mixPercent = slider5;
+mixPercent == 40 ? mixPercent = 100;
+mixPercent == -40 ? mixPercent = -100;
+
+slider5 <= 0 ?
+(
+crossT1 = 1;
+crossT2 = 2 ^ ( mixPercent/ 6 );
+) :
+(
+crossT1 = 2 ^ ( -mixPercent / 6 );
+crossT2 = 1;
+);
+
+
+@sample
+
+s0 = spl0;
+s1 = spl1;
+
+s2 = spl2;
+s3 = spl3;
+
+// Sample 1 Low
+
+sample1Low0 = (tmplLow1 = a0Low1*s0 - b1Low1*tmplLow1 + cDenorm);
+sample1Low1 = (tmprLow1 = a0Low1*s1 - b1Low1*tmprLow1 + cDenorm);
+
+// Sample 1 High
+
+sample1High0 = s0 - sample1Low0;
+sample1High1 = s1 - sample1Low1;
+
+// Sample 2 Low
+
+sample2Low0 = (tmplLow2 = a0Low2*s2 - b1Low2*tmplLow2 + cDenorm);
+sample2Low1 = (tmprLow2 = a0Low2*s3 - b1Low2*tmprLow2 + cDenorm);
+
+// Sample 2 High
+
+sample2High0 = s2 - sample2Low0;
+sample2High1 = s3 - sample2Low1;
+
+
+slider6 == 0 ? (
+us1k0 = sample1High0;
+us1k1 = sample1High1;
+) :
+(
+us1k0 = sample1Low0;
+us1k1 = sample1Low1;
+);
+
+slider7 == 0 ? (
+us2k0 = sample2High0;
+us2k1 = sample2High1;
+) :
+(
+us2k0 = sample2Low0;
+us2k1 = sample2Low1;
+);
+
+// Create komposit signal
+
+Komposit0 = us1k0 + us2k0;
+Komposit1 = us1k1 + us2k1;
+
+// Crossfade Komposit + Sample2
+
+// left mix
+spl0 = ((Komposit0 * levelT1 * crossT1) + (s2 * levelT2 * crossT2));
+
+// right mix
+spl1 = ((Komposit1 * levelT1 * crossT1) + (s3 * levelT2 * crossT2));
+
+// Crossfade Komposit + Sample1
+
+// left mix
+spl2 = ((Komposit0 * levelT1 * crossT1) + (s0 * levelT2 * crossT2));
+
+// right mix
+spl3 = ((Komposit1 * levelT1 * crossT1) + (s1 * levelT2 * crossT2));
+
+

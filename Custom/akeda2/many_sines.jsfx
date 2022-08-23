@@ -1,0 +1,23 @@
+desc:Many sinewaves
+
+import cookdsp.jsfx-inc
+
+slider1:-24<-96,0,1>Level (dB)
+
+@init
+
+frm = 100;
+sine1.sine(frm, 0);
+sine2.sine(frm*10, 0);
+sine3.sine(frm*100, 0);
+sine4.sine(frm*150, 0);
+
+@slider
+gain=2^(slider1 /6);
+
+@sample
+spl0 += ((sine1.sine_do()+sine2.sine_do()+sine3.sine_do()+sine4.sine_do()) *gain);//* 0.125);
+spl1=spl0;
+/*
+spl1 += ((sine1.sine_do()+sine2.sine_do()+sine3.sine_do()+sine4.sine_do()) *gain);//* 0.125);
+*/

@@ -1,0 +1,8 @@
+desc:Mono - dual mono, sum without negative gain
+//tags: mono downmix sum nogain
+//author: akeda
+
+@sample
+tmp0=(spl0+spl1);
+
+spl0=spl1=tmp0;
