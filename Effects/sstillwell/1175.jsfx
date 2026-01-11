@@ -40,6 +40,7 @@ out_pin:left output
 out_pin:right output
 
 @init
+  ext_tail_size = -1;
   log2db = 8.6858896380650365530225783783321; // 20 / ln(10)
   db2log = 0.11512925464970228420089957273422; // ln(10) / 20 
   attime=0.010;
@@ -55,6 +56,7 @@ out_pin:right output
   mix=1;
   gr_meter=1;
   gr_meter_decay = exp(1/(1*srate));
+  ext_gr_meter = 0;
 
 @slider
   thresh = slider1;
@@ -104,7 +106,7 @@ out_pin:right output
     cratio = ratio;
   );
   
-  gr = -overdb * (cratio-1)/cratio;
+  ext_gr_meter = gr = -overdb * (cratio-1)/cratio;
   grv = exp(gr * db2log);
   
   runmax = maxover + relcoef * (runmax - maxover);  // highest peak for setting att/rel decays in reltime

@@ -51,27 +51,19 @@ desc:Super8 MIDI-controlled synchronized looper (Cockos)
 //   (useful for hand-shortages)
 // - latch: wait to run commands until next loop iteration
 
-
-in_pin:input 1
-in_pin:input 2
-in_pin:input 3
-in_pin:input 4
-in_pin:input 5
-in_pin:input 6
-in_pin:input 7
-in_pin:input 8
-out_pin:output 1
-out_pin:output 2
-out_pin:output 3
-out_pin:output 4
-out_pin:output 5
-out_pin:output 6
-out_pin:output 7
-out_pin:output 8
+<? nch < 1 ? nch = 8 ?>
+<? maxmem < 8 ? maxmem = 256 ?>
+<?
+  loop(x=0;nch,printf("in_pin:input %d\n",x+=1));
+  loop(x=0;nch,printf("out_pin:output %d\n",x+=1));
+?>
 out_pin:monitor output
 out_pin:click output
 
-options: maxmem=33000000 no_meter
+config: nch "Channels" 8 1 2 4 8="8 (namesake)" 12 16 24 32 48
+config: maxmem "Memory Size -preserve-config" 256 64="64MB - max length 0:23 for 8 channels @ 44.1kHz" 128="128MB - max length 0:47 for 8 channels @ 44.1kHz" 256="256MB (default) - max length 1:35 for 8 channels @ 44.1kHz" 512="512MB - max length 3:10 for 8 channels @ 44.1kHz" 1024="1GB - max length 6:20 for 8 channels @ 44.1kHz"
+
+options: maxmem=<? printf("%d",maxmem*1024*128); ?> no_meter gfx_idle prealloc=* 
 
 slider1:g_slider_sync=0<0,2,1{off,project,playback}>-Sync
 slider4:g_slider_click_cnt=0<0,64,1>-Click count/length
@@ -79,10 +71,10 @@ slider4:g_slider_click_cnt=0<0,64,1>-Click count/length
 @init
 
 // constants
-g_nchan = 8;
+g_nchan = <? printf("%d",nch) ?>;
 g_max_alloc = __memtop(); // JSFX memory available
 g_latchq_len = 1024; // 1024 midi events queueable for latch mode
-g_maxlen = ((g_max_alloc-4096 - g_latchq_len*3)/(g_nchan+1))|0; // use nearly all of available memory
+g_maxlen = ((g_max_alloc - 4096 - g_latchq_len*3)/g_nchan)|0; // use nearly all of available memory
 g_infthreshdb = -120;
 g_infthresh = 10^(g_infthreshdb/20);
 g_latchmode=0;
@@ -103,12 +95,15 @@ st_lastpkupd = 9; // time of last peak drawin
 st_peak_in = 10;
 st_rdc = 11; // msec, chX.rdc is samples
 st_div = 12; // subdiv, 1=normal, chX.div is 1/this
-st_num = 13;
+st_fade_size = 13; // fadeout size
+st_num = 14;
 
 function recalc_fades() (
-  g_fadespeed = exp(-1/(srate * 0.002));  // fade speed for playback/monitoring
+  g_fadespeed = exp(-1/(srate * 0.002));  // fade speed for monitoring
   g_slope_recin = 1/(srate * 0.001); // fade length for starting rec
-  g_slope_recout = 1/(srate * 0.030); // fade length for ending rec
+  g_slope_recout = -1/(srate * 0.030); // fade length for ending rec
+  g_slope_playin = 1/(srate * 0.050); // fade length for starting playback
+  g_slope_playout = -1/(srate * 0.050); // fade length for ending playback
 );
 
 recalc_fades();
@@ -129,10 +124,10 @@ function updatefromrec() instance(rec)
 );
 
 function init(x, n1,n2,n3) 
-  instance(idx rec buf monvol fpos fpos2 fpos_slope sk_fpos2 dirty_top) 
+  instance(idx rec buf monvol fpos fpos2 fpos_slope fpos2_slope dirty_top) 
 (
   idx = x;
-  fpos_slope = monvol = fpos = fpos2 = sk_fpos2 = 0;
+  fpos_slope = monvol = fpos = fpos2 = fpos2_slope = 0;
   dirty_top = -1;
   buf = alloc(g_maxlen);
   
@@ -149,22 +144,34 @@ function init(x, n1,n2,n3)
   rec[st_peak_in] = 0;
   rec[st_rdc] = 0;
   rec[st_div] = 1;
+  rec[st_fade_size] = 0;
   
   this.updatefromrec();
 );
 
-function get_zero_buffer(buf,buftop) (
-  buftop > 0 ? ( 
-    get_section() != 'gfx' && buftop > max(8192, g_spare_buf_ztop) ? ( 
-      atomic_exch(buf, g_spare_buf);
-      atomic_exch(buftop, g_spare_buf_ztop);
-    );
-    buftop > 0 ? memset(buf,0,buftop);
+// clearing the buffer when starting recording on a particular channel
+function set_need_zero(dt) global(g_maxlen) instance(need_zero nz_0) (
+  need_zero = max(need_zero, min(g_maxlen,dt+1));
+  nz_0 = -1;
+);
+function process_need_zero(p1, p2) global()
+  instance(need_zero nz_0 nz_0e nz_1 nz_1e nz_2 buf) 
+  local(sz)
+(
+  nz_0 === -1 ? (
+    // three write pointers:  0..p1 p1..p2 p2..need_zero
+    nz_0 = 0;
+    nz_0e = nz_1 = min(p1,p2);
+    nz_1e = nz_2 = max(p1,p2);
   );
-  buf;
+  
+  (sz = min(8, nz_0e-nz_0)) > 0 ? ( memset(buf + nz_0, 0, sz); nz_0 += sz; );
+  (sz = min(8, nz_1e-nz_1)) > 0 ? ( memset(buf + nz_1, 0, sz); nz_1 += sz; );
+  (sz = min(8, need_zero-nz_2)) > 0 ? ( memset(buf + nz_2, 0, sz); nz_2 += sz; );
+  nz_2 >= need_zero && nz_1 >= nz_1e && nz_0>=nz_0e ? need_zero=0;
 );
 
-function setstate(st) instance(fpos_slope, sk_fpos2, rec) local(dt)
+function setstate(st) instance(fpos_slope, fpos2_slope, rec) local(dt)
 (
   rec[st_state] ? (
     st==0 ? ( 
@@ -172,12 +179,12 @@ function setstate(st) instance(fpos_slope, sk_fpos2, rec) local(dt)
     ) : g_length > 0 ? (
       g_firstrec = 0;   
       g_prevent_processing &= 0xe;
-      this.extra_recording = 0|min(srate*.5, g_maxlen-g_length);
+      this.extra_recording = (g_pos == 0 || g_pos == g_length) ? (0|min(srate*.5, g_maxlen-g_length)) : 0;
     );
   ) : (
     st>0 ? ( 
       st == 2 && (dt = max(rec[st_dirty], this.dirty_top+1)) > 0 ? (
-        this.buf = rec[st_buf] = get_zero_buffer(this.buf,dt);
+        this.set_need_zero(dt);
         this.dirty_top=-1;
         rec[st_dirty]=0;
       );
@@ -204,10 +211,12 @@ function setstate(st) instance(fpos_slope, sk_fpos2, rec) local(dt)
   
   st == 2 ? (
     fpos_slope = g_slope_recin;
-    sk_fpos2 = 1 - g_fadespeed;
+    fpos2_slope = g_slope_playin;
   ) : (
-    fpos_slope = -g_slope_recout;
-    sk_fpos2 = st > 0 ? (1 - g_fadespeed) : 0;
+    fpos_slope = g_slope_recout;
+    fpos2_slope = st > 0 ? g_slope_playin :
+                  (rec[st_fade_size]>0) ? -1/(rec[st_fade_size]*g_length) :
+                  g_slope_playout;
   );
 );
 
@@ -221,16 +230,8 @@ function is_chan_selected(idx) (
 );
 
 function setstate_for_rec(rec, state) (
-  // ugly cruft
   rec = (rec-mem_stlist)/st_num;
-  rec == 0 ? ch1.setstate(state) :
-  rec == 1 ? ch2.setstate(state) :
-  rec == 2 ? ch3.setstate(state) :
-  rec == 3 ? ch4.setstate(state) :
-  rec == 4 ? ch5.setstate(state) :
-  rec == 5 ? ch6.setstate(state) :
-  rec == 6 ? ch7.setstate(state) :
-  rec == 7 ? ch8.setstate(state);
+  <? loop(x=0;nch, printf("rec == %d ? ch%d.setstate(state) :\n",x,x+1); x+=1) ?> 0;
 );
 
 function play_or_stop_all() local(want_state rec)
@@ -247,15 +248,48 @@ function play_or_stop_all() local(want_state rec)
   );
 );
 
-function process(s)
-  instance(fpos, fpos2, monvol, monmode, rec, peak_in, div)
-  local(r,wrpos,buf, l_length, l_pos, l_offs)
+function process_rev(buf)
+  instance(rev_state, rev_pos, rev_p0, rev_p1, rev_p2,
+           rev_fade_pos, rev_fade_slope, l_length, l_pos, l_offs)
+  local(tmpo old)
+  global(srate)
 (
-  g_prevent_processing==0 ? (
+  // if the user reverses right after starting recording, shrug
+  this.need_zero > 0 ? this.process_need_zero(l_offs+l_length,l_offs+l_length);
+
+  // process reverse ahead of the read pointer
+  // if l_pos is more than halfway, then we go until the end, then the mirror of the original l_pos+1
+  // if l_pos is less than halfway, we go until the halfway point, then to the mirror of the original l_pos+1
+  rev_pos === -1 ? (
+    rev_pos = (l_length/2)|0; // number of samples we need to reverse, also the halfway point
+    rev_fade_slope = 1.0/(srate * 0.030);
+    rev_fade_pos = 0;
+    rev_p0 = l_pos;
+    rev_p1 = l_pos < rev_pos ? rev_pos+1 : l_length;
+    rev_p2 = l_length - 1 + 1 - l_pos;
+  );
+  loop(min(20, rev_pos), // a 10s loop will take 500ms to reverse
+    tmpo = buf + l_length - 1 - rev_p0;
+    old=buf[rev_p0];
+    buf[rev_p0] = tmpo[];
+    tmpo[] = old;
+    (rev_p0 += 1) == rev_p1 ? rev_p0 = rev_p2;
+    rev_pos -= 1;
+  );
+  rev_fade_pos = min(rev_fade_pos + rev_fade_slope, 1);
+  rev_pos == 0 && rev_fade_pos == 1 ? rev_state=0;
+  buf[l_pos] * rev_fade_pos + buf[l_length - 1 - l_pos] * (1-rev_fade_pos);
+);
+
+function process(s)
+  instance(fpos, fpos2, monvol, monmode, rec, peak_in, div, l_length, l_pos)
+  local(r,wrpos,buf,l_offs, sc)
+(
+  g_prevent_processing===0 ? (
     fpos = min(max(0,fpos+this.fpos_slope),1);
-    fpos2 = fpos2*g_fadespeed + this.sk_fpos2;
+    sc = sqr(fpos2 = min(max(0,fpos2+this.fpos2_slope),1));
   ) : (
-    fpos = fpos2 = 0;
+    fpos = fpos2 = sc = 0;
   );
   peak_in = max(abs(s),peak_in);
 
@@ -264,14 +298,14 @@ function process(s)
   l_offs = g_offs;
   div < 1 ? (
     l_length = max((l_length*div+0.5)|0,1);
-    g_firstrec == 0 ? (
+    g_firstrec === 0 ? (
       l_pos %= l_length;
       l_offs %= l_length;
     );
   );
   wrpos = l_pos;
   buf = this.buf + l_offs;
-  g_firstrec == 0 ? (
+  g_firstrec === 0 ? (
     this.extra_recording > 0 ? (
       buf[l_length + l_pos] = s; // write past the end of the loop (in case we want to trim later)
       this.dirty_top = max(this.dirty_top,l_length + l_pos + l_offs);
@@ -283,18 +317,17 @@ function process(s)
       wrpos < 0 ? wrpos += l_length;
     );
   );
-  monmode == 0 ? (
+  this.need_zero > 0 ? this.process_need_zero(l_offs+wrpos,l_offs+l_pos);
+  
+  r = this.rev_state!==0 ? this.process_rev(buf)*sc : sc > 0.0001 ? buf[l_pos]*sc;
+  monmode === 0 ? (
     // no monitoring
     fpos > 0.0001 ? (
       this.dirty_top = max(this.dirty_top,wrpos + l_offs);
-      r=buf[l_pos]*fpos2;
       buf[wrpos] += s*fpos;
-      r;
-    ) : fpos2 > 0.0001 ? (
-      buf[l_pos]*fpos2;
-    ) : 0;
-    
-  ) : ( 
+    );
+    r;
+  ) : (
     this.monmode_sel ? (
       monvol = 1 + (monvol-1)*g_fadespeed;
     ) : ( 
@@ -304,33 +337,29 @@ function process(s)
     fpos > 0.0001 ? (
       this.dirty_top = max(this.dirty_top,wrpos + l_offs);
       wrpos == l_pos ? (
-        (buf[l_pos] += s*fpos) * fpos2 + s * max(0, monvol - fpos*fpos2);
+        buf[l_pos] += s*fpos;
+        r + s*max(fpos*sc, monvol);
       ) : (
         buf[wrpos] += s*fpos;
-        buf[l_pos] * fpos2 + s * monvol;
+        r + s * monvol;
       );
-    ) : fpos2 > 0.0001 ? (
-      buf[l_pos]*fpos2 + s*monvol;
     ) : (
-      s*monvol;
+      r + s*monvol;
     );
   );
 );
 
-function reverse(want_defer) instance(rec) local(i,x,tmp,l)
+function rev_stop() instance (rec)
 (
-  // reverse
+  atomic_set(this.rev_requested,0);
+  this.rev_state=0;
+);
+
+function reverse() instance(rec) local(l)
+(
+  atomic_add(this.rev_requested,1);
   l = (g_length * this.div)|0;
-  i=this.buf + g_offs%l;
-  x=i + l-1;
-  loop(l/2,
-    tmp=i[0];
-    i[0]=x[0];
-    x[0]=tmp;
-    x-=1;
-    i+=1;
-  );
-  rec[st_dirty] = this.dirty_top = max(rec[st_dirty],max(this.dirty_top,(g_offs%l)+l));
+  rec[st_dirty] = this.dirty_top = max(rec[st_dirty],max(this.dirty_top,l));
   rec[st_lastd] = -1;
 );
 
@@ -339,13 +368,13 @@ function onmsg(m1,m2,m3) instance(rec,note,note2,note3,note4)
 (
    newstate = -1;
    (m2 == note && (m2 != note2 || rec[st_state]==0)) || m2 == 1024+rec+st_note1 ? (
-     newstate = (rec[st_state] == 2 && g_firstrec==0) ? 1 : 2;
+     newstate = (rec[st_state] == 2 && g_was_firstrec==0) ? 1 : 2;
    ) : m2 == note2  || m2 == 1024+rec+st_note2 ? (
      newstate = rec[st_state] == 2 || (rec[st_state]==0 && g_length) ? 1 : 0
    ) : m2 == note3 ? (
      g_chan_selected = (g_chan_selected == this.idx) ? -1 : this.idx;
    ) : m2 == note4 || m2 == 1024+rec+st_note4 ? (
-     this.reverse(1);
+     this.reverse();
    );
    newstate >= 0 ? (
      this.setstate(newstate);
@@ -423,27 +452,14 @@ function adjustsizes(scale, repup) local(nlen,olen, lp, l, offs, nlen2)
 
 function updatechfromrec()
 (
-  ch1.updatefromrec();
-  ch2.updatefromrec();
-  ch3.updatefromrec();
-  ch4.updatefromrec();
-  ch5.updatefromrec();
-  ch6.updatefromrec();
-  ch7.updatefromrec();
-  ch8.updatefromrec();
+  <? loop(x=0;nch,printf("ch%d.updatefromrec();\n",x+=1)) ?>
 );
 
 function reset() local(lp)
 ( 
   g_chan_selected=-1;
-  ch1.setstate(0); ch1.dirty_top=-1; // setstate() will latch dirty_top to st_dirty
-  ch2.setstate(0); ch2.dirty_top=-1;
-  ch3.setstate(0); ch3.dirty_top=-1;
-  ch4.setstate(0); ch4.dirty_top=-1;
-  ch5.setstate(0); ch5.dirty_top=-1;
-  ch6.setstate(0); ch6.dirty_top=-1;
-  ch7.setstate(0); ch7.dirty_top=-1;
-  ch8.setstate(0); ch8.dirty_top=-1;
+  // setstate() will latch dirty_top to st_dirty
+  <? loop(x=0;nch, x+=1; printf("ch%d.setstate(0); ch%d.rev_stop(); ch%d.dirty_top=-1;\n",x,x,x)) ?>
   lp = mem_stlist;
   loop(g_nchan,
     lp[st_dirty] > 0 ? (
@@ -465,17 +481,6 @@ function estbpm(len) local(bpm, tsnum) global(ts_num, srate, cfgp_clickcnt)
   while (bpm < 60) ( bpm*=2; );
   while (bpm > 240) ( bpm/=2; );
   bpm;
-);
-
-function gen_action(i)
-(
-  i == cfgp_reset  ? reset() : 
-  i == cfgp_halve  ? adjustsizes(0.5,1) : 
-  i == cfgp_double ? adjustsizes(2,1) : 
-  i == cfgp_double_norep ? adjustsizes(2,0) : 
-  i == cfgp_export  ? g_need_export=1 : 
-  i == cfgp_xfade   ? adjustsizes(1, 0) :
-  i == cfgp_playall || i == cfgp_playsel ? g_inject_midinote = 1024 + i; // inject to support latch mode
 );
 
 
@@ -537,7 +542,6 @@ ext_noinit == 0 ? (
   mem_stlist = alloc(g_nchan * st_num);
 
   g_inject_midinote = 0;
-  g_need_export = 0;
 
   g_inactive_blockcnt=0;  
   g_active_mask = 0; 
@@ -549,17 +553,13 @@ ext_noinit == 0 ? (
   g_prevent_processing = 0; // &1=gate, &2=sync mode
   g_chan_selected = -1; // currently selected channel
   g_lastmsg = -1;
-  g_spare_buf = alloc(g_maxlen);
-  g_spare_buf_ztop = 0;
   
-  ch1.init(0, 36,37, 128);
-  ch2.init(1, 38,39, 128);
-  ch3.init(2, 41,42, 128);
-  ch4.init(3, 43,44, 128);
-  ch5.init(4, 45,46, 128);
-  ch6.init(5, 48,49, 128);
-  ch7.init(6, 50,51, 128);
-  ch8.init(7, 53,54, 128);
+  <? loop(x=0;a=36; nch, 
+      printf("ch%d.init(%d,%d,%d, 128);\n",x+1,x,a,a+1);
+      a+= x==1 ||x==4 || x==6? 3 : 2;
+      x+=1;
+     )
+   ?>
 );
 
 @slider
@@ -607,21 +607,16 @@ function doconf() local(i,s) (
     );  
   );
 
-  file_avail(0) != 0 ? (
-    i = mem_stlist;
-    loop(g_nchan,
-      file_var(0,i[st_rdc]);
-      i+=st_num;
+  loop(x=0;3, // st_rdc, st_div, st_fade_size
+    file_avail(0) != 0 ? (
+      i = mem_stlist;
+      loop(g_nchan,
+        file_var(0,i[st_rdc+x]);
+        i+=st_num;
+      );
     );
+    x+=1;
   );
-  
-  file_avail(0) != 0 ? (
-    i = mem_stlist;
-    loop(g_nchan,
-      file_var(0,i[st_div]);
-      i+=st_num;
-    );
-  );  
 
   file_avail(0)>=0 ? ( // is reading config
     updatechfromrec();
@@ -636,11 +631,6 @@ doconf();
 @block
 g_peak_decay = 10^(-samplesblock/srate*10);
 
-function trimspare() local(a) (
-  a = min(g_spare_buf_ztop, 65536);
-  memset(g_spare_buf + (g_spare_buf_ztop -= a),0,a);
-);
-g_spare_buf_ztop > 0 ? trimspare();
 
 g_prevent_processing &= 0xd;
 (g_syncmode=cfgp_sync[]) ? (
@@ -648,10 +638,10 @@ g_prevent_processing &= 0xd;
   g_length = (srate * (g_click_int>0?g_click_int:ts_num) * 240.0 / (tempo * ts_denom))|0;
   (play_state&1) ? (
     g_inactive_blockcnt=0;
-    g_pos = (play_position*srate)%g_length;
+    g_pos = (play_position*srate + 0.5)%g_length;
   ) : (
     g_syncmode==2 ? (
-      g_pos = (play_position*srate)%g_length;
+      g_pos = (play_position*srate + 0.5)%g_length;
       g_prevent_processing |= 2;
     ) : (
       g_pos %= g_length;
@@ -662,6 +652,8 @@ g_prevent_processing &= 0xd;
 
 g_syncmode==0 || (!(play_state&1) && g_syncmode != 2) ? (
   g_active_mask==0 ? (
+    <? loop(i=0;nch, printf("%s ch%d.fpos2 > 0.0001\n",i?"||":"",i+1); i+=1; );
+       printf("? g_inactive_blockcnt=0;\n"); ?>
     g_inactive_blockcnt < 2 ? ( 
       g_inactive_blockcnt+=1; 
     ) : (
@@ -684,21 +676,21 @@ g_inject_midinote >= 1024 ? (
 
 function onblock()
   instance(rec peak_in monmode_sel monmode idx)
-  global(g_peak_decay st_peak_in)
+  global(g_peak_decay st_peak_in srate last_w g_length)
 (
   rec[st_peak_in] = peak_in;
   peak_in *= g_peak_decay;
   monmode_sel = monmode >= 2 || is_chan_selected(idx);
+  this.rev_state == 0 || !g_length ? (
+    this.rev_requested && atomic_exch(this.rev_state=0,this.rev_requested) ? (
+      this.rev_state &= 1;
+      this.rev_pos = -1;
+    );
+  );
+  this.rev_state !== 0 ? last_w=-1; // force redraw if reversing this block
 );
 
-ch1.onblock();
-ch2.onblock();
-ch3.onblock();
-ch4.onblock();
-ch5.onblock();
-ch6.onblock();
-ch7.onblock();
-ch8.onblock();
+<? loop(x=0;nch, printf("ch%d.onblock();\n",x+=1)) ?>
 
 (g_click_int = (cfgp_clickcnt[]|0)) > 0 ?( 
   g_click_lenspls = (0.01*srate)|0;
@@ -712,20 +704,14 @@ i_srate = 1.0/srate;
 
 function chan_onmsg(m1,m2,m3)
 (
+  g_was_firstrec = g_firstrec; // latch to this value for any messages that apply to multiple channels
   (m2 == cfgp_playsel[] || m2 == 1024+cfgp_playsel) && g_chan_selected>=0 ? (
     m2 = 1024 + mem_stlist + g_chan_selected*st_num + st_note1 + 
       (mem_stlist[g_chan_selected*st_num + st_state]?1:0);
   );
 
   m2 == cfgp_playall[] || m2 == 1024+cfgp_playall ? play_or_stop_all();
-  ch1.onmsg(m1,m2,m3);
-  ch2.onmsg(m1,m2,m3);
-  ch3.onmsg(m1,m2,m3);
-  ch4.onmsg(m1,m2,m3);
-  ch5.onmsg(m1,m2,m3);
-  ch6.onmsg(m1,m2,m3);
-  ch7.onmsg(m1,m2,m3);
-  ch8.onmsg(m1,m2,m3);
+  <? loop(x=0;nch, printf("ch%d.onmsg(m1,m2,m3);\n",x+=1)) ?>
 );
 
 function latchq_add(m1,m2,m3) local(v)
@@ -789,12 +775,12 @@ while (sidx == nextmsg_offs)
       latchq_add(nextmsg_1,nextmsg_2,nextmsg_3);
     );
     
-    nextmsg_2 == cfgp_reset[]        ? gen_action(cfgp_reset);
-    nextmsg_2 == cfgp_halve[]        ? gen_action(cfgp_halve);
-    nextmsg_2 == cfgp_double[]       ? gen_action(cfgp_double);
-    nextmsg_2 == cfgp_double_norep[] ? gen_action(cfgp_double_norep); 
-    nextmsg_2 == cfgp_export[]       ? gen_action(cfgp_export);
-    nextmsg_2 == cfgp_xfade[]        ? gen_action(cfgp_xfade);
+    nextmsg_2 == cfgp_reset[]        ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "r")) :
+    nextmsg_2 == cfgp_halve[]        ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "h")) :
+    nextmsg_2 == cfgp_double[]       ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "d")) :
+    nextmsg_2 == cfgp_double_norep[] ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "D")) :
+    nextmsg_2 == cfgp_export[]       ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "e")) :
+    nextmsg_2 == cfgp_xfade[]        ? (strlen(#mainthread_todo)<100 ? strcat(#mainthread_todo, "x"));
       
     nextmsg_2 < 1024 ? g_lastmsg = nextmsg_2;
   );
@@ -812,21 +798,16 @@ g_chan_selected >= 0 ? (
   );
 );
 
-spl0=ch1.process(spl0);
-spl1=ch2.process(spl1);
-spl2=ch3.process(spl2);
-spl3=ch4.process(spl3);
-spl4=ch5.process(spl4);
-spl5=ch6.process(spl5);
-spl6=ch7.process(spl6);
-spl7=ch8.process(spl7);
+g_pos >= g_length && g_firstrec == 0 ? g_pos = 0;
 
-g_prevent_processing==0 ? ( 
+<? loop(x=0;nch, printf("spl%d=ch%d.process(spl%d);\n",x,x+1,x);x+=1) ?>
+
+g_prevent_processing===0 ? (
   g_click_int > 0 && g_active_mask && g_length > 0 && !g_firstrec ? (
-    spl9 = generate_click();
+    <? printf("spl%d",nch+1) ?> = generate_click();
   );
 
-  g_firstrec ? (
+  g_firstrec !== 0 ? (
      (g_pos+=1) >= g_maxlen ? (
        g_firstrec=0;
        g_pos=0;
@@ -840,17 +821,11 @@ g_prevent_processing==0 ? (
   );
 );
 
-g_chan_selected >= 0 ? (
-  spl8= spl(g_chan_selected);
-) : (
-  spl8=0;
-);
+<? printf("spl%d",nch) ?> = g_chan_selected >= 0 ? spl(g_chan_selected);
 
 @gfx 420 480
 
 get_section('gfx');
-
-gfx_clear=-1;
 
 function format_note(str, note) //1=CC,2=PC
 (
@@ -906,11 +881,11 @@ function draw_value_tweaker(xpos,ypos,midimem,draw, lbl)
     lbl == "RDC" ? (
       t ? (
         cap_last_y = mouse_y;
-        midimem[0] = min(max(midimem[0]-t*(.1*4),0),100);
+        midimem[0] = min(max(midimem[0]-t*(.1*4),0),500);
         rec2 = get_linked_rec(((midimem-mem_stlist)/st_num)|0);
         rec2 >= 0 ? (
           rec2[st_rdc]=midimem[0];
-          lastchanlink |= (1<<20); // trigger redraw
+          lastchanlink |= (1<<40); // trigger redraw
         );
         updatechfromrec();
         draw=1;
@@ -923,7 +898,24 @@ function draw_value_tweaker(xpos,ypos,midimem,draw, lbl)
           midimem[0] = t;
           updatechfromrec();
           draw=1;
-          lastchanlink |= (1<<20); // trigger redraw
+          lastchanlink |= (1<<40); // trigger redraw
+        );
+      );
+    ) : lbl == "fad" ? (
+      (tw=-(t|0)) ? (
+        cap_last_y = mouse_y - (t + tw)*4;
+        t = max(midimem[0],0);
+        t==0 && tw > 0 ? t = 1/16;
+        tw > 0 ? ( t >= 2 ? t+=1 : t*=2; ) : ( t<2 ? t/=2 : t -= 1 );
+        t < 1/16 ? t=0;
+        t > 32 ? t=32;
+        midimem[0] != t ? (
+          midimem[0] = t;
+          lm = get_linked_rec((midimem-mem_stlist)/st_num);
+          lm >= 0 ? lm[st_fade_size] = midimem[0];
+          updatechfromrec();
+          draw=1;
+          lastchanlink |= (1<<40); // trigger redraw
         );
       );
     ) : (
@@ -957,15 +949,15 @@ function draw_value_tweaker(xpos,ypos,midimem,draw, lbl)
             g_inject_midinote = 1024+midimem;
           ) : (
             t = ((midimem-mem_stlist)/st_num)|0;
-            t == 0 ? ch1.reverse() :
-            t == 1 ? ch2.reverse() :
-            t == 2 ? ch3.reverse() :
-            t == 3 ? ch4.reverse() :
-            t == 4 ? ch5.reverse() :
-            t == 5 ? ch6.reverse() :
-            t == 6 ? ch7.reverse() :
-            t == 7 ? ch8.reverse();
+            <? loop(x=0;nch, printf("t == %d ? ch%d.reverse() :\n",x,x+1); x+=1;) ?> 0;
           );
+        ) : t == st_fade_size ? (
+          midimem[0] = midimem[0] ? -midimem[0] : 1;
+          lm = get_linked_rec((midimem-mem_stlist)/st_num);
+          lm >= 0 ? lm[st_fade_size] = midimem[0];
+          updatechfromrec();
+          draw=1;
+          lastchanlink |= (1<<40); // trigger redraw
         );
       );
     ) : (mouse_cap & 2) && !(last_mouse_cap&2) ? (
@@ -982,6 +974,12 @@ function draw_value_tweaker(xpos,ypos,midimem,draw, lbl)
       do_overlay=0;
       t=floor(t*10)*.1;
       t = t<0.1 ? "0mS" : sprintf(#str, t<10?"%.1f":"%d",t);
+    ) : lbl == "fad" ? (
+      t >= 1 ? (
+        t=sprintf(#,"%d",t);
+      ) : t > 0 ? (
+        t=sprintf(#,"1/%d",ceil(1/t));
+      ) : t="off";
     ) : (
       (do_overlay=format_note(#str,t)) ? (
         do_overlay = do_overlay==1?"CC":"PC";
@@ -1010,8 +1008,26 @@ function draw_value_tweaker(xpos,ypos,midimem,draw, lbl)
   w;
 );
 
-function draw_waveform(xpos,ycent,w,amp,bptr,srclen) local(minv,maxv, i,v, di, dbptr)
+function draw_waveform(xpos,ycent,w,amp,start_offs,bptr,srclen,chan_idx)
+  local(minv,maxv, i,v, di, dbptr z0 z0e z1 z1e z2 z2e)
 (
+  bptr += start_offs;
+  <? 
+    0 /*enable this if you want to show/debug zeroing logic*/ ? printf("z2e = 0;") :
+    loop(i=0; nch,
+      printf("chan_idx == %d ? ( (z2e = ch%d.need_zero)>0 ? ( 
+                  z0 = ch%d.nz_0; z0e = ch%d.nz_0e;
+                  z1 = ch%d.nz_1; z1e = ch%d.nz_1e;
+                  z2 = ch%d.nz_2;
+                )) %s\n",i,i+1,i+1,i+1,i+1,i+1,i+1,
+                i == nch-1 ? ";" : ":");
+                i+=1; 
+      );
+  ?>
+  z2e > 0 ? (
+    z0 += start_offs; z1 += start_offs; z2 += start_offs;
+    z0e += start_offs; z1e += start_offs; z2e += start_offs;
+  );
   minv=100;
   maxv=-100;
   i=xpos|0;
@@ -1020,7 +1036,10 @@ function draw_waveform(xpos,ycent,w,amp,bptr,srclen) local(minv,maxv, i,v, di, d
   di = w / srclen;
   ycent|=0;
   loop(srclen,
-    v=bptr[0];
+    v = z2e <= 0 || (
+        (bptr < z0 || bptr >= z0e) &&
+        (bptr < z1 || bptr >= z1e) &&
+        (bptr < z2 || bptr >= z2e)) ? bptr[0] : 0;
     minv=min(v,minv);
     maxv=max(v,maxv);
     bptr+=dbptr;
@@ -1126,10 +1145,10 @@ function draw(ixpos, ypos) local(i i2 w h gap rec mode force_redraw rowsize
 
   gap = 4;
   xpos = (ixpos += 2);
-  col = (gfx_h-ypos-8) / (gfx_w - ixpos);
+  col = 16*(gfx_h-ypos-8) / ((gfx_w - ixpos)*(g_nchan+8));
   rowsize = col <= .115 ? 16 : col <= .5 ? 8 : col <= 2 ? 4 : col <= 8 ? 2 : 1;
   w=(gfx_w - 2 - gap*(rowsize-1))/rowsize;
-  (nrows = 16/rowsize) != 2 ? w=min(w, ((gfx_h - ypos - 8 - gap*(nrows-1))/nrows));
+  (nrows = (8+g_nchan)/rowsize) != 2 ? w=min(w, ((gfx_h - ypos - 8 - gap*(nrows-1))/nrows));
 
   h=(w|=0);
   mw = (w*.2)|0;
@@ -1183,7 +1202,7 @@ function draw(ixpos, ypos) local(i i2 w h gap rec mode force_redraw rowsize
 
       gfx_set(0.5);
       w > 80 && rec[st_dirty] && (wl = floor(g_length/rec[st_div] + 0.5)) > 0 ?
-        draw_waveform(xpos+gap,ypos+h*.5,floor(w/rec[st_div]+.5)-2*gap,h*.25, rec[st_buf]+(g_offs % wl),wl);
+        draw_waveform(xpos+gap,ypos+h*.5,floor(w/rec[st_div]+.5)-2*gap,h*.25, rec[st_buf], (g_offs % wl),wl, i);
 
       rec[st_monmode]==0 ? (
         gfx_set(0.2)
@@ -1225,7 +1244,8 @@ function draw(ixpos, ypos) local(i i2 w h gap rec mode force_redraw rowsize
     
     lx = -mx+gap;
     lx += draw_value_tweaker(lx,my,t + st_rdc, wantr, "RDC") + gap;
-    w > 90 ? draw_value_tweaker(lx,my,t + st_div, wantr, "div");
+    w > 90 ? lx += draw_value_tweaker(lx,my,t + st_div, wantr, "div") + gap;
+    w > 120 ? lx += draw_value_tweaker(lx,my,t + st_fade_size, wantr, "fad") + gap;
 
     w > 120 ? (
       lx = xpos+gap;
@@ -1300,12 +1320,18 @@ function draw(ixpos, ypos) local(i i2 w h gap rec mode force_redraw rowsize
                sprintf(#,"%s%.0f mS",w<98 ? "" : w<160 ? "fade " : "halve fade: ",lasthalve)
                );
     );
-    draw_value_tweaker(-(xpos+w-gap),
-      min(ypos+h-24-gap,gfx_h-24), 
-      mem_gen_cfg + i, force_redraw, 0);
+
+    i += mem_gen_cfg;
+    draw_value_tweaker(-(xpos+w-gap), min(ypos+h-24-gap,gfx_h-24),  i, force_redraw, 0);
 
     !(last_mouse_cap&1) && (mouse_cap&1) && mouse_in(xpos,ypos,w,h) ? (
-      gen_action(mem_gen_cfg + i);
+      i == cfgp_reset        ? strcat(#mainthread_todo, "r") :
+      i == cfgp_halve        ? strcat(#mainthread_todo, "h") :
+      i == cfgp_double       ? strcat(#mainthread_todo, "d") :
+      i == cfgp_double_norep ? strcat(#mainthread_todo, "D") :
+      i == cfgp_export       ? strcat(#mainthread_todo, "e") :
+      i == cfgp_xfade        ? strcat(#mainthread_todo, "x") :
+      i == cfgp_playall || i == cfgp_playsel ? g_inject_midinote = 1024 + i; // inject to support latch mode
     );
 
     t+=1;
@@ -1326,7 +1352,7 @@ function draw_position(ypos) local(last_pos,last_len)
     gfx_set(0.25,0.125,0.0);
     gfx_rect(0,ypos,gfx_w,20);
     gfx_set(0.125,0.25,0.5);
-    gfx_rect(0,ypos,g_pos/g_length * gfx_w,20);
+    g_length > 0 ? gfx_rect(0,ypos,g_pos/g_length * gfx_w,20);
     gfx_x=2;
     gfx_y=ypos+2;
     gfx_set(1,1,1);
@@ -1335,10 +1361,8 @@ function draw_position(ypos) local(last_pos,last_len)
   );
 );
 
-
 function draw_topbar(need_ref) local(s,i,t, lastlen, lastgate, lastlatch, lastclickcount, lastvclickoffs, lastoffs, lastsync)
 (
-//need_ref=1;
   need_ref == 0 ? (
     need_ref = (lastlen != g_length || 
                 lastsync != cfgp_sync[] ||
@@ -1437,7 +1461,7 @@ function draw_topbar(need_ref) local(s,i,t, lastlen, lastgate, lastlatch, lastcl
   gfx_x=0;
   gfx_y=4;
   t=time_precise();
-  s="Super8";
+  s="Super<?printf("%d",nch)?>";
   i=0;
   loop(strlen(s),
     gfx_set(sin(t+i*0.2)*0.3+0.5, cos(t*.61+i*0.5)*.7+0.3, sin(t*2.1-i*0.6)*.3+0.7);
@@ -1463,58 +1487,6 @@ function get_vclick_pos(latms) local(tmp)
       floor(g_pos * vclick_len / g_length)
     ) : -1;
   ) : -1;
-);
-
-vclick_pos = cfgp_vclick[]>0 ? get_vclick_pos(cfgp_vclick[]) : -1;
-
-last_vclick_pos != vclick_pos ? (
-  last_w=0;
-  last_vclick_pos=vclick_pos;
-);
-
-last_w != gfx_w || last_h != gfx_h ? (
- gfx_set(0.125);
- gfx_rect(0,0,gfx_w,gfx_h);
-);
-
-draw_topbar(last_w != gfx_w || last_h != gfx_h);
-draw_position(15);
-draw(0, 40);
-
-gfx_x=0;
-gfx_y=gfx_h-8;
-gfx_set(0);
-gfx_rect(gfx_x,gfx_y,6*8,8);
-gfx_set(.3);
-g_peakvol < g_infthresh ? (
-  gfx_printf("-inf");
-) : (
-  gfx_printf("%.0fdB",log10(g_peakvol)*20);
-  g_peakvol *= 0.93;
-);
-
-g_lastmsg>=0 && g_lastmsg_draw!=g_lastmsg ? (
-  g_lastmsg_t = format_note(#str,g_lastmsg);
-  gfx_x=gfx_w-g_lastmsg_w;
-  g_lastmsg_w = (strlen(#str) + (g_lastmsg_t?3:0)) * 8;
-  gfx_x = min(gfx_x, gfx_w-g_lastmsg_w);
-  gfx_y=gfx_h-8;
-  gfx_set(0);
-  gfx_rect(gfx_x,gfx_y,gfx_w-gfx_x,8);
-  gfx_set(.3);
-  gfx_x = gfx_w-g_lastmsg_w;
-  gfx_printf("%s%s",g_lastmsg_t==1?"CC ":g_lastmsg_t?"PC ":"",#str);
-  g_lastmsg_draw=g_lastmsg;
-);
-
-last_w = gfx_w;
-last_h = gfx_h;
-last_mouse_cap = mouse_cap;
-0 == (mouse_cap & 3) ? (
-  cap_mode > 0 ? (
-    sliderchange(-1);
-  );
-  cap_mode = 0;
 );
 
 function draw_vclick(pos,clen) 
@@ -1544,8 +1516,6 @@ function draw_vclick(pos,clen)
   gfx_setfont(0);
 );
 
-vclick_pos >= 0 ? draw_vclick(vclick_pos,vclick_len);
-
 function draw_trim_waveform(xpos, ypos, w, h, chan, isend)
   global(g_length mem_stlist st_num st_dirty st_buf g_offs srate) 
   local(rec buf len maxl linepos xpos2 w2)
@@ -1572,33 +1542,87 @@ function draw_trim_waveform(xpos, ypos, w, h, chan, isend)
     buf = 0;
   );
   
-  buf += rec[st_buf];
-  
-  
   g_length && rec[st_dirty] ? 
-    draw_waveform(xpos2,ypos+h*.5,w2,h*.25,buf,len);
+    draw_waveform(xpos2,ypos+h*.5,w2,h*.25,rec[st_buf],buf,len,chan);
     
   gfx_set(0,.5,.7,.5);
   xpos += (w*(isend?.8:.2))|0;
   gfx_line(xpos,ypos,xpos,ypos+h);
 );
 
-cap_mode == cfgp_offs || cap_mode == cfgp_length ? (
-  g_edgetrim_drawstate>=0 ? (
-    draw_trim_waveform(0,40,gfx_w,gfx_h-40, max(g_chan_selected,0), cap_mode == cfgp_length);
-    g_edgetrim_drawstate=1;
+!(gfx_ext_flags&2) ? (
+  gfx_clear=-1;
+  
+  vclick_pos = cfgp_vclick[]>0 ? get_vclick_pos(cfgp_vclick[]) : -1;
+  
+  last_vclick_pos != vclick_pos ? (
+    last_w=0;
+    last_vclick_pos=vclick_pos;
   );
-) : (
-  g_edgetrim_drawstate>0 ? (
-    last_w=-1;
-    g_edgetrim_drawstate=0;
-  );  
-);
+  
+  last_w != gfx_w || last_h != gfx_h ? (
+    gfx_set(0.125);
+    gfx_rect(0,0,gfx_w,gfx_h);
+  );
+  
+  draw_topbar(last_w != gfx_w || last_h != gfx_h);
+  draw_position(15);
+  draw(0, 40);
+  
+  gfx_x=0;
+  gfx_y=gfx_h-8;
+  gfx_set(0);
+  gfx_rect(gfx_x,gfx_y,6*8,8);
+  gfx_set(.3);
+  g_peakvol < g_infthresh ? (
+    gfx_printf("-inf");
+  ) : (
+    gfx_printf("%.0fdB",log10(g_peakvol)*20);
+    g_peakvol *= 0.93;
+  );
+  
+  g_lastmsg>=0 && g_lastmsg_draw!=g_lastmsg ? (
+    g_lastmsg_t = format_note(#str,g_lastmsg);
+    gfx_x=gfx_w-g_lastmsg_w;
+    g_lastmsg_w = (strlen(#str) + (g_lastmsg_t?3:0)) * 8;
+    gfx_x = min(gfx_x, gfx_w-g_lastmsg_w);
+    gfx_y=gfx_h-8;
+    gfx_set(0);
+    gfx_rect(gfx_x,gfx_y,gfx_w-gfx_x,8);
+    gfx_set(.3);
+    gfx_x = gfx_w-g_lastmsg_w;
+    gfx_printf("%s%s",g_lastmsg_t==1?"CC ":g_lastmsg_t?"PC ":"",#str);
+    g_lastmsg_draw=g_lastmsg;
+  );
+  
+  last_w = gfx_w;
+  last_h = gfx_h;
+  last_mouse_cap = mouse_cap;
+  0 == (mouse_cap & 3) ? (
+    cap_mode > 0 ? (
+      sliderchange(-1);
+    );
+    cap_mode = 0;
+  );
+  
+  vclick_pos >= 0 ? draw_vclick(vclick_pos,vclick_len);
+  
+  cap_mode == cfgp_offs || cap_mode == cfgp_length ? (
+    g_edgetrim_drawstate>=0 ? (
+      draw_trim_waveform(0,40,gfx_w,gfx_h-40, max(g_chan_selected,0), cap_mode == cfgp_length);
+      g_edgetrim_drawstate=1;
+    );
+  ) : (
+    g_edgetrim_drawstate>0 ? (
+      last_w=-1;
+      g_edgetrim_drawstate=0;
+    );  
+  );
+); // !(gfx_ext_flags&2)
 
-// export must happen from UI thread
+
 function export()  local(rec, flag, tidx, idx, ster, l)
 (
-  // export, yay reaper 5.05 undocumented function!
   rec = mem_stlist;
   flag=1<<16; // go to end of project
   flag|=2<<16; // use tempo from next parameter
@@ -1621,8 +1645,14 @@ function export()  local(rec, flag, tidx, idx, ster, l)
   );
 );
 
-g_need_export ? (
-  export();
-  g_need_export = 0;
-);
+strlen(#mainthread_todo) > 0 ? (
+  mtc = str_getchar(#mainthread_todo,0);
+  strcpy_substr(#mainthread_todo,#mainthread_todo,1);
 
+  mtc == 'r' ? reset() :
+  mtc == 'h' ? adjustsizes(0.5,1) :
+  mtc == 'd' ? adjustsizes(2,1) :
+  mtc == 'D' ? adjustsizes(2,0) :
+  mtc == 'e' ? export() :
+  mtc == 'x' ? adjustsizes(1, 0);
+);

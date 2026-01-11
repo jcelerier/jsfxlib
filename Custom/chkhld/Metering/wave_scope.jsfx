@@ -1,5 +1,5 @@
 desc:       Wave Scope
-version:    1.8.2
+version:    1.8.3
 author:     chokehold
 tags:       utility metering visualization scope amplitude
 link:       https://github.com/chkhld/jsfx/
@@ -7,8 +7,10 @@ screenshot: https://github.com/chkhld/jsfx/blob/main/assets/screenshots/wave_sco
 about:
  # Wave Scope
  
- Simple volume adjustment between -48 and +48 dBfs for
- non-destructive edits or gain staging between plugins.
+ Waveform display that can visualise various mono/stereo channel streams as Decibels 
+ and signed or absolute samples. With fadeable colours and freeze-on-pause function.
+ This means the colour of the waveform could be controlled by parameter modulation,
+ and when you pause playback, the waveform won't continue updating or vanish.
 
 // ----------------------------------------------------------------------------
 // Don't need no I/O metering for dis
@@ -18,7 +20,7 @@ slider1:routing=0<0,3,1{Stereo (L+R),Mono (left),Mono (right),Mono (L+R summed)}
 slider2:scaling=0<0,2,1{Decibels,Samples (absolute),Samples (signed)}>Display scale
 slider3:speed=10<1,250,1>Display speed
 slider4:tint=90<0,255,0.01>Display colour
-slider5:freeze=2<0,1,1{Off,On,Stop/Pause}>Freeze
+slider5:freeze=2<0,2,1{Off,On,Stop/Pause}>Freeze
 
 in_pin:Input L
 in_pin:Input R
@@ -42,7 +44,7 @@ out_pin:none
   colourG = 0; // Green colour default amount [0,1]
   colourB = 0; // Blue colour default amount [0,1]
   
-  // Conversion between Decibels and float gain factos
+  // Conversion between Decibels and float amplitudes
   //
   // Converts dB values to float gain factors. Divisions
   // are slow, so: dB/20 --> dB * 1/20 --> dB * 0.05
@@ -64,7 +66,7 @@ out_pin:none
   // Rescales a value from a defined arbitrary range to range [0,1]
   // and can "weight" the scale by setting a center value.
   // 
-  function normalize (low, high, value, center) local (proportion, skew)
+  function normalise (low, high, value, center) local (proportion, skew)
   (
     proportion = (value - low) / (high - low);
     skew = log(0.5) / log10((center - low) / (high - low));
@@ -191,7 +193,15 @@ out_pin:none
   // Triggers a display freeze when project is stopped 
   // or paused in "Play/Pause" freeze mode. Responsive
   // enough if this is switched in the @block section.
-  stopped = (freeze == 2 && play_state < 1) ? 1 : 0;
+  //
+  // Play state values:
+  // <0=error
+  //  0=stopped
+  //  1=playing
+  //  2=paused
+  //  5=recording
+  //  6=record paused
+  stopped = (freeze == 2 && (play_state <1 || play_state == 2 || play_state == 6));
   
 @sample
   
@@ -323,7 +333,7 @@ out_pin:none
           gfx_x = gfx_w - stepOffset;
           gfx_y = centerY;
           
-          scaling == 0 ? sampleL = normalize(-144, 0, gainTodB(sampleL), -48);
+          scaling == 0 ? sampleL = normalise(-144, 0, gainTodB(sampleL), -48);
           
           // Draw line upwards with length scaled by sample value
           gfx_lineto(gfx_x, centerY - scale * sampleL, 1);
@@ -381,7 +391,7 @@ out_pin:none
           gfx_x = gfx_w - stepOffset;
           gfx_y = centerY;
           
-          scaling == 0 ? sampleR = normalize(-144, 0, gainTodB(sampleR), -48);
+          scaling == 0 ? sampleR = normalise(-144, 0, gainTodB(sampleR), -48);
           
           // Draw line downwards with length scaled by sample value
           gfx_lineto(gfx_x, centerY + scale * sampleR, 1);
