@@ -5,7 +5,7 @@
     "name": "JSFX pack",
     "raw_name": "jsfx_pack",
     "short": "JSFX audio and MIDI effects and utilities",
-    "size": "250M",
+    "size": "406M",
     "url": "https://github.com/jcelerier/jsfxlib",
-    "version": 1
+    "version": 2
 }
